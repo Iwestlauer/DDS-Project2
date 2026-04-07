@@ -1,0 +1,18 @@
+Questions
+
+How to get "zone" from location ID? worry about this after the analysis only when presenting the results
+
+What are the tip-related variables?
+1. 
+
+what derived features? such as the total distance vs total time - how quick was it for the distance 
+trip_quickness = trip_distance/(dropoff time - pickup time)
+
+interesting - payment type = dispute
+
+where pickup locationID is not dropoff locationID
+
+subset: payment type = 1 (credit card payments only)
+
+
+

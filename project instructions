@@ -1,0 +1,14 @@
+1.	Pick a year of Yellow Taxi data. 2025
+2.	Import the PARQUET files into R using arrow. 
+3.	Decide what subset of the data you want to study, if any. 
+4.	Define and clean the tip-related variables. 
+
+
+5.	Explore the data to identify possible tipping patterns. 
+6.	Develop 3 useful insights. 
+7.	Build a prediction model for tip amount. 
+8.	Check whether your model meets the RMSE and MAE thresholds. 
+9.	Present both your findings and your model clearly.
+10.	Build an RShiny dashboard to communicate your findings. 
+11.	Add a natural language feature using RAG, fine-tuning, or both so users can ask questions about the project.
+12.	Test the app to make sure the responses are useful and connected to your actual analysis.
