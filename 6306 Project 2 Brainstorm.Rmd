@@ -1,0 +1,23 @@
+---
+title: "6306 - Final Project Brainstorm"
+author: "Josh"
+date: "2026-04-03"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+# install.packages("arrow")
+library(arrow)
+trips_01 <- read_parquet('/Users/joshtsamuel/SMU/DS-6306 Doing Data Science/Units/Final Project/Data/yellow_tripdata_2025-01.parquet')
+trips_02 <- read_parquet('/Users/joshtsamuel/SMU/DS-6306 Doing Data Science/Units/Final Project/Data/yellow_tripdata_2025-02.parquet')
+trips_03 <- read_parquet('/Users/joshtsamuel/SMU/DS-6306 Doing Data Science/Units/Final Project/Data/yellow_tripdata_2025-03.parquet')
+trips_04 <- read_parquet('/Users/joshtsamuel/SMU/DS-6306 Doing Data Science/Units/Final Project/Data/yellow_tripdata_2025-04.parquet')
+
+master = rbind(trips_01, trips_02, trips_03)
+
+library(naniar)
+gg_miss_var(master)
+
+```
