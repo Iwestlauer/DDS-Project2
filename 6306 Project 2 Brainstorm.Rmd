@@ -8,6 +8,23 @@ editor_options:
 ---
 
 ```{r}
+Get a test set we can use for EDA (5-10 rows)
+- Let's say we want to plot tip amount vs fare amount
+- as long as that goes well, we can plot the millions points
+- tip amount will be response variable
+- what can we change thats going to change the tip amount
+- what variable are we interested in that are categorical vs continuous
+- zone variables are categorical not numerical
+- look for something that has strong correlation with tip amount
+- ggpairs to look at correlation among predictors
+- 
+
+
+
+```
+
+
+```{r}
 # install.packages("arrow")
 library(arrow)
 trips_01 <- read_parquet('/Users/joshtsamuel/SMU/DS-6306 Doing Data Science/Units/Final Project/Data/yellow_tripdata_2025-01.parquet')
