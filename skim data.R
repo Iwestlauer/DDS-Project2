@@ -14,3 +14,7 @@ dim(taxi)[1]
 head(taxi)
 summary(taxi)
 skim(taxi)
+
+library(DataExplorer)
+plot_intro(taxi)
+plot_missing(taxi)

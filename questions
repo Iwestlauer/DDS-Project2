@@ -5,7 +5,8 @@ How to get "zone" from location ID?
   https://catalog.data.gov/dataset/nyc-taxi-zones-131e4
 
 What are the tip-related variables?
-  1. 
+  1. season? do tourists tip better?
+  
 
 What derived features could be useful? 
   such as the total distance vs total time - how quick was it for the distance 
@@ -18,11 +19,15 @@ where pickup locationID is not dropoff locationID
 How are we going to subset the data so we're not working with 50M+ observations?
   subset: payment type = 1 (credit card payments only)
   This is most of the data!
+  maybe a random sample- evenly distributed over months
+  Filter down to one borough?
+  only fare amounts over $0 -- typical taxi ride
 
 How are we going to handle missing values?
   considering that the only variables where there are missing values may not be relevant
   to our analysis, we may just choose to ignore them (passenger_count, 
   RatecodeID, congestion_surcharge, Airport_fee)
+  Actually we might need the passenger_count! -- JOSH can look into it
   
 How to split tpep_pickup_datetime into different columns- date, and time (just the hour)
   format(the_posix_var, "%H") returns the hour as a character string

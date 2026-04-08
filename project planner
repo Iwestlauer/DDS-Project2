@@ -14,11 +14,14 @@ done	Import the PARQUET files into R using arrow.
 ####GOAL: finish initial prediction model by Monday 4/13
 
 10.	Build an RShiny dashboard to communicate your findings. 
-####GOAL: finish RShiny by Wednesday 4/15
+####GOAL: finish RShiny and Initial Presentation Deck by Wednesday 4/15
     
 11.	Add a natural language feature using RAG, fine-tuning, or both so users can ask questions about the project.
 12.	Test the app to make sure the responses are useful and connected to your actual analysis.
-####GOAL: finish NLP by Friday 4/17
+####GOAL: finish NLP/RAG and video recording by Friday 4/17
+
+Josh Stat oral exam Fri 4/17
+Josh Stat Exam Sat 4/18
     
 ####GOAL: finish polishing project by Sunday 4/19
 
