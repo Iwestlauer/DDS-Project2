@@ -6,7 +6,6 @@ How to get "zone" from location ID?
 
 What are the tip-related variables?
   1. season? do tourists tip better?
-  
 
 What derived features could be useful? 
   such as the total distance vs total time - how quick was it for the distance 
@@ -17,11 +16,16 @@ What is payment_type = dispute?
 where pickup locationID is not dropoff locationID
 
 How are we going to subset the data so we're not working with 50M+ observations?
+  What size are we aiming for? idk
+  Do meaningful filtering before doing stratification!! 
+  (Don't accidentally get more data for one season than another.)
+  
   subset: payment type = 1 (credit card payments only)
   This is most of the data!
-  maybe a random sample- evenly distributed over months
+  maybe a random sample- evenly distributed over months "stratified sample"
   Filter down to one borough?
   only fare amounts over $0 -- typical taxi ride
+  only trip distance over 0
 
 How are we going to handle missing values?
   considering that the only variables where there are missing values may not be relevant

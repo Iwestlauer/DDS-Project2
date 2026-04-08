@@ -60,7 +60,17 @@ sampled_data <- map_dfr(files, function(f) {
   
   df <- read_parquet(
     f,
-    col_select = c("tpep_pickup_datetime", "tpep_dropoff_datetime", "fare_amount", "trip_distance", "passenger_count", "tip_amount", "total_amount", "PULocationID", "DOLocationID", "payment_type", "extra")
+    col_select = c("tpep_pickup_datetime", 
+                   "tpep_dropoff_datetime", 
+                   "fare_amount", 
+                   "trip_distance", 
+                   "passenger_count", 
+                   "tip_amount", 
+                   "total_amount", 
+                   "PULocationID", 
+                   "DOLocationID", 
+                   "payment_type", 
+                   "extra")
   )
   
   df %>%
@@ -73,6 +83,72 @@ sampled_data <- map_dfr(files, function(f) {
 
 # Checking if even sample from each of the months
 sampled_data %>% count(source_file)
+```
+
+# Skim Data
+```{r}
+library(skimr)
+skim(sampled_data)
+library(DataExplorer)
+plot_intro(sampled_data)
+plot_missing(sampled_data)
+# Note passenger_count is 22.12% missing
+```
+
+# Placeholder for Missing Values Handling
+```{r}
+```
+
+# Mutate POSIX features
+```{r}
+# get useful info from the pickup and dropoff datetimes
+library(lubridate) #intuitive functions to handle datetime data
+sampled_data <- sampled_data %>%
+  dplyr::mutate(
+    pickup_hour <- hour(sampled_data$tpep_pickup_datetime),
+    dropoff_hour <- hour(sampled_data$tpep_dropoff_datetime),
+    pickup_date <- ymd_hms(sampled_data$tpep_pickup_datetime),
+    pickup_weekday_num <- wday(pickup_date), # 1 = Sunday by default
+    pickup_weekday_name <- wday(pickup_date, label = TRUE, abbr = TRUE)
+  )
+
+```
+
+# Get Borough from LocationID
+```{r}
+#read in taxi zone lookup
+zone_lookup <- read.csv("NYC_Taxi_Zones.csv") # "Location ID",	"Borough"
+
+# if needed, clean up any leftover from previous join
+# sampled_data <- sampled_data %>%
+#   select(-Borough.y)
+
+# left join pickup borough into df
+sampled_data <- sampled_data %>%
+  left_join(zone_lookup, by = c("PULocationID" = "Location.ID")) %>%
+  rename(PUBorough = Borough) %>%
+  left_join(zone_lookup, by = c("DOLocationID" = "Location.ID")) %>%
+  rename(DOBorough = Borough)
+
+head(sampled_data$Borough)
+# Ignore the warning message "unknown or uninitialised column"
+```
+
+# Feature Engineering -- Trip Speed
+```{r}
+library(lubridate)
+
+sampled_data <- sampled_data %>%
+  dplyr::mutate(
+    pickup_time  = ymd_hms(tpep_pickup_datetime),
+    dropoff_time = ymd_hms(tpep_dropoff_datetime),
+    # Calculate difference in minutes
+    trip_minutes = interval(pickup_time, dropoff_time) / minutes(1),
+    # trip quickness in miles per hour
+    trip_speed_mph = 60* trip_distance / trip_minutes
+  )
+
+hist(sampled_data$trip_speed_mph)
 ```
 
 # EDA
