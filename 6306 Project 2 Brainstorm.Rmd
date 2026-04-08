@@ -8,6 +8,7 @@ editor_options:
 ---
 
 ```{r}
+## NOTES
 # Get a test set we can use for EDA (5-10 rows)
 # - Let's say we want to plot tip amount vs fare amount
 # - as long as that goes well, we can plot the millions points
@@ -18,21 +19,117 @@ editor_options:
 # - look for something that has strong correlation with tip amount
 # - ggpairs to look at correlation among predictors
 
+# TO DO LIST
+# - LOOK passenger count
 
 ```
-
 
 ```{r}
-# install.packages("arrow")
+# library(here)
+# library(arrow)
+# 
+# trips_01 <- read_parquet(here("Data", "yellow_tripdata_2025-01.parquet"))
+# trips_02 <- read_parquet(here("Data", "yellow_tripdata_2025-02.parquet"))
+# trips_03 <- read_parquet(here("Data", "yellow_tripdata_2025-03.parquet"))
+# trips_04 <- read_parquet(here("Data", "yellow_tripdata_2025-04.parquet"))
+# trips_05 <- read_parquet(here("Data", "yellow_tripdata_2025-05.parquet"))
+# trips_06 <- read_parquet(here("Data", "yellow_tripdata_2025-06.parquet"))
+# trips_07 <- read_parquet(here("Data", "yellow_tripdata_2025-07.parquet"))
+# trips_08 <- read_parquet(here("Data", "yellow_tripdata_2025-08.parquet"))
+# trips_09 <- read_parquet(here("Data", "yellow_tripdata_2025-09.parquet"))
+# trips_10 <- read_parquet(here("Data", "yellow_tripdata_2025-10.parquet"))
+# trips_11 <- read_parquet(here("Data", "yellow_tripdata_2025-11.parquet"))
+# trips_12 <- read_parquet(here("Data", "yellow_tripdata_2025-12.parquet"))
+```
+
+# Reading in Data & Sampling
+```{r}
 library(arrow)
-trips_01 <- read_parquet('/Users/joshtsamuel/SMU/DS-6306 Doing Data Science/Units/Final Project/Data/yellow_tripdata_2025-01.parquet')
-trips_02 <- read_parquet('/Users/joshtsamuel/SMU/DS-6306 Doing Data Science/Units/Final Project/Data/yellow_tripdata_2025-02.parquet')
-trips_03 <- read_parquet('/Users/joshtsamuel/SMU/DS-6306 Doing Data Science/Units/Final Project/Data/yellow_tripdata_2025-03.parquet')
-trips_04 <- read_parquet('/Users/joshtsamuel/SMU/DS-6306 Doing Data Science/Units/Final Project/Data/yellow_tripdata_2025-04.parquet')
+library(dplyr)
+library(here)
+library(purrr)
+library(stringr)
+library(ggplot2)
 
-master = rbind(trips_01, trips_02, trips_03)
+files <- list.files(here("data"), pattern = "\\.parquet$", full.names = TRUE)
 
+target_n <- 1000
+n_per_file <- ceiling(target_n / length(files))
+
+sampled_data <- map_dfr(files, function(f) {
+  
+  df <- read_parquet(
+    f,
+    col_select = c("tpep_pickup_datetime", "tpep_dropoff_datetime", "fare_amount", "trip_distance", "passenger_count", "tip_amount", "total_amount", "PULocationID", "DOLocationID", "payment_type", "extra")
+  )
+  
+  df %>%
+    slice_sample(n = min(nrow(df), n_per_file)) %>%
+    mutate(
+      source_file = basename(f),
+      month = str_extract(basename(f), "\\d{4}-\\d{2}")
+    )
+})
+
+# Checking if even sample from each of the months
+sampled_data %>% count(source_file)
+```
+
+# EDA
+```{r}
+# Looking at NAs
 library(naniar)
-gg_miss_var(master)
+gg_miss_var(sampled_data)
+## passenger_count has a lot of NAs
+
+str(sampled_data)
+
+# making four columns factors
+sampled_data <- sampled_data %>%
+  mutate(across(c(PULocationID, DOLocationID, payment_type, month), as.factor))
+# check
+str(sampled_data)
+
+
+# PLOTTING
+
+ggplot(sampled_data, aes(x = trip_distance)) +
+  geom_histogram(bins = 30)
+
+ggplot(sampled_data, aes(x = month, y = fare_amount)) +
+  geom_boxplot()
+
+ggplot(sampled_data, aes(x = trip_distance, y = fare_amount)) +
+  geom_point(alpha = 0.5)
+
+ggplot(sampled_data, aes(x = trip_distance, y = fare_amount)) +
+  geom_point(alpha = 0.5)
+
+ggplot(sampled_data, aes(x = fare_amount, y = tip_amount)) +
+  geom_point(alpha = 0.5)
+
+# Creating Duration (mins) Column
+df <- sampled_data %>%
+  mutate(
+    tpep_pickup_datetime  = as.POSIXct(tpep_pickup_datetime, format = "%Y-%m-%d %H:%M:%S"),
+    tpep_dropoff_datetime = as.POSIXct(tpep_dropoff_datetime, format = "%Y-%m-%d %H:%M:%S"),
+    duration_mins = as.numeric(difftime(tpep_dropoff_datetime, tpep_pickup_datetime, units = "mins"))
+  )
+
+# Looking at values per mile
+
+df <- df %>%
+  mutate(
+    fare_per_mile   = if_else(trip_distance > 0, fare_amount / trip_distance, NA_real_),
+    fare_per_min    = if_else(duration_mins > 0, fare_amount / duration_mins, NA_real_),
+    tip_per_mile    = if_else(trip_distance > 0, tip_amount / trip_distance, NA_real_),
+    tip_per_min     = if_else(duration_mins > 0, tip_amount / duration_mins, NA_real_),
+    tip_pct_fare    = if_else(fare_amount > 0, 100 * tip_amount / fare_amount, NA_real_)
+  )
+
+
+
 
 ```
+
+
