@@ -1,0 +1,20 @@
+---
+title: "skim taxi data"
+author: "Isabella Westlauer"
+date: "2026-04-07"
+output: html_document
+---
+
+```{r}
+library(arrow)
+library(dplyr)
+library(skimr)
+# data dictionary
+# https://www.nyc.gov/assets/tlc/downloads/pdf/data_dictionary_trip_records_yellow.pdf
+
+taxi <- read_parquet(file.choose(), header = TRUE) |> skim()
+head(taxi)
+summary(taxi)
+skim(taxi)
+```
+

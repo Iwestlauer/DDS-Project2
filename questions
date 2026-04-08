@@ -1,18 +1,33 @@
 Questions
 
-How to get "zone" from location ID? worry about this after the analysis only when presenting the results
+How to get "zone" from location ID? 
+  worry about this after the analysis only when presenting the results
+  https://catalog.data.gov/dataset/nyc-taxi-zones-131e4
 
 What are the tip-related variables?
-1. 
+  1. 
 
-what derived features? such as the total distance vs total time - how quick was it for the distance 
-trip_quickness = trip_distance/(dropoff time - pickup time)
+What derived features could be useful? 
+  such as the total distance vs total time - how quick was it for the distance 
+  trip_quickness = trip_distance/(dropoff time - pickup time)
 
-interesting - payment type = dispute
+What is payment_type = dispute?
 
 where pickup locationID is not dropoff locationID
 
-subset: payment type = 1 (credit card payments only)
+How are we going to subset the data so we're not working with 50M+ observations?
+  subset: payment type = 1 (credit card payments only)
+  This is most of the data!
 
+How are we going to handle missing values?
+  considering that the only variables where there are missing values may not be relevant
+  to our analysis, we may just choose to ignore them (passenger_count, 
+  RatecodeID, congestion_surcharge, Airport_fee)
+  
+How to split tpep_pickup_datetime into different columns- date, and time (just the hour)
+  format(the_posix_var, "%H") returns the hour as a character string
+  lubridate::hour(the_posix_var)
+  
+  
 
 
