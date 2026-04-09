@@ -1,0 +1,8 @@
+# Wednesday 4/8
+- Passenger Count is driver-reported so when driver doesnt report count, it will
+be a NA
+- If we want to keep passenger_count in our model, then we should remove 
+observations where its NA 
+- In our sampled data, there are a few rows where pickup time and drop off time
+are the exact same time stamp. Therefore trip_minutes = 0, and trip_speed_mph = Inf
+- 

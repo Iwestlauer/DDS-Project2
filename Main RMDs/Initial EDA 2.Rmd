@@ -1,0 +1,377 @@
+---
+title: "Initial EDA 2"
+author: "Josh"
+date: "2026-04-08"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Libraries
+```{r setup}
+library(tidyverse)
+library(arrow)
+library(here)
+library(purrr)
+library(stringr)
+library(lubridate)
+library(DataExplorer)
+library(skimr)
+library(ggplot2)
+library(dplyr)
+```
+
+# Reading in Data & Sampling
+```{r}
+# Filter to trips with both pickup and dropoff in Manhattan, then take an even sample across months
+
+
+files <- list.files(here("Main data"), pattern = "\\.parquet$", full.names = TRUE)
+
+# Read in taxi zone lookup
+zone_lookup <- read.csv(here("Additional Data", "NYC_Taxi_Zones.csv"))
+
+# Get the Location IDs that belong to Manhattan
+manhattan_ids <- zone_lookup %>%
+  filter(Borough == "Manhattan") %>%
+  pull(Location.ID)
+
+target_n <- 10000
+n_per_file <- ceiling(target_n / length(files))
+
+sampled_data <- map_dfr(files, function(f) {
+  
+  df <- read_parquet(
+    f,
+    col_select = c(
+      "tpep_pickup_datetime",
+      "tpep_dropoff_datetime",
+      "fare_amount",
+      "trip_distance",
+      "passenger_count",
+      "tip_amount",
+      "total_amount",
+      "PULocationID",
+      "DOLocationID",
+      "payment_type",
+      "extra"
+    )
+  )
+  
+  df %>%
+    # Keep only trips where both pickup and dropoff are in Manhattan
+    filter(
+      PULocationID %in% manhattan_ids,
+      DOLocationID %in% manhattan_ids
+    ) %>%
+    # Take an even sample from each file/month
+    slice_sample(n = min(nrow(.), n_per_file)) %>%
+    mutate(
+      source_file = basename(f),
+      month = str_extract(basename(f), "\\d{4}-\\d{2}")
+    )
+})
+
+# Checking if there is an even sample from each of the months
+sampled_data %>% count(source_file)
+```
+
+# Skim Data
+```{r}
+skim(sampled_data)
+plot_intro(sampled_data)
+plot_missing(sampled_data)
+
+# Note: passenger_count is 22.12% missing
+```
+
+# Placeholder for Missing Values Handling
+```{r}
+
+
+```
+
+# Mutate POSIX Features
+```{r}
+# Get useful info from the pickup and dropoff datetimes
+
+sampled_data <- sampled_data %>%
+  mutate(
+    pickup_time = ymd_hms(tpep_pickup_datetime),
+    dropoff_time = ymd_hms(tpep_dropoff_datetime),
+    pickup_hour = hour(pickup_time),
+    dropoff_hour = hour(dropoff_time),
+    pickup_date = as_date(pickup_time),
+    pickup_weekday_num = wday(pickup_time), # 1 = Sunday by default
+    pickup_weekday_name = wday(pickup_time, label = TRUE, abbr = TRUE)
+  )
+```
+
+# Get Borough from LocationID
+```{r}
+# Left join pickup and dropoff borough into the sampled data
+
+sampled_data <- sampled_data %>%
+  left_join(
+    zone_lookup %>% select(Location.ID, Borough),
+    by = c("PULocationID" = "Location.ID")
+  ) %>%
+  rename(PUBorough = Borough) %>%
+  left_join(
+    zone_lookup %>% select(Location.ID, Borough),
+    by = c("DOLocationID" = "Location.ID")
+  ) %>%
+  rename(DOBorough = Borough)
+
+head(sampled_data$PUBorough)
+head(sampled_data$DOBorough)
+
+# If you try sampled_data$Borough, you may get an "unknown or uninitialised column"
+# no more warning because Borough has been renamed to PUBorough and DOBorough.
+```
+
+# Feature Engineering -- Trip Speed
+```{r}
+sampled_data <- sampled_data %>%
+  mutate(
+    # Calculate difference in minutes
+    trip_minutes = interval(pickup_time, dropoff_time) / minutes(1),
+    # Trip quickness in miles per hour
+    trip_speed_mph = 60 * trip_distance / trip_minutes
+  )
+
+hist(sampled_data$trip_speed_mph)
+```
+
+# More Data Cleaning
+```{r}
+# Looking at ALL Yellow Trips in January
+
+trips_01 <- trips_01 %>%
+  mutate(
+    pickup_time = ymd_hms(tpep_pickup_datetime),
+    dropoff_time = ymd_hms(tpep_dropoff_datetime),
+    # Calculate difference in minutes
+    trip_minutes = interval(pickup_time, dropoff_time) / minutes(1),
+    # Trip quickness in miles per hour
+    trip_speed_mph = 60 * trip_distance / trip_minutes
+  )
+
+# In January - NOT looking at sampled_data but trips_01 to get better idea of pattern
+sum(trips_01$trip_minutes <= 0, na.rm = TRUE) 
+sum(is.na(trips_01$trip_minutes))       
+sum(is.na(trips_01$pickup_time))    
+sum(is.na(trips_01$dropoff_time))              
+
+na_trips <- trips_01 %>%
+  filter(is.na(trip_minutes))
+
+# NAs in trip_minutes are due to either pickup or dropoff time being at 0:00:00
+# or there being NA for dropoff time.
+# Might need to remove these because they cause NA in trip_speed_mph.
+
+sum(is.na(trips_01$trip_speed_mph))
+
+na_trips2 <- trips_01 %>%
+  filter(is.na(trip_speed_mph))
+
+inf_trips <- trips_01 %>%
+  filter(is.infinite(trip_speed_mph)) # due to trip_minutes being 0
+```
+
+# EDA for Tip %
+```{r}
+# Step 1: Creating Response for Tipping Behavior
+
+# Looking at Tip %
+sampled_data <- sampled_data %>%
+  mutate(
+    tip_pct = if_else(fare_amount > 0, tip_amount / fare_amount, NA_real_)
+  )
+
+# Capping Extreme Tip % Values between 0 and 100 whenever fare amount is too low
+sampled_data <- sampled_data %>%
+  mutate(
+    tip_pct = if_else(fare_amount > 0, tip_amount / fare_amount, NA_real_),
+    tip_pct = if_else(tip_pct < 0 | tip_pct > 1, NA_real_, tip_pct)
+  )
+
+# Step 2: Summary statistics
+sampled_data %>%
+  summarise(
+    mean_tip = mean(tip_amount, na.rm = TRUE),
+    median_tip = median(tip_amount, na.rm = TRUE),
+    mean_tip_pct = mean(tip_pct, na.rm = TRUE),
+    median_tip_pct = median(tip_pct, na.rm = TRUE)
+  )
+
+# Step 3: EDA PLOTS
+
+# Distribution of tip percentage
+ggplot(sampled_data, aes(x = tip_pct)) +
+  geom_histogram(bins = 30) +
+  labs(
+    title = "Distribution of Tip Percentage",
+    x = "Tip Percentage",
+    y = "Count"
+  )
+
+# Tip percentage by weekday
+ggplot(sampled_data, aes(x = pickup_weekday_name, y = tip_pct)) +
+  geom_boxplot() +
+  labs(
+    title = "Tip Percentage by Pickup Weekday",
+    x = "Weekday",
+    y = "Tip Percentage"
+  )
+
+# Tip percentage vs trip distance
+ggplot(sampled_data, aes(x = trip_distance, y = tip_pct)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "Tip Percentage vs Trip Distance",
+    x = "Trip Distance",
+    y = "Tip Percentage"
+  )
+
+# Average tip percentage by payment type
+sampled_data %>%
+  group_by(payment_type) %>%
+  summarise(avg_tip_pct = mean(tip_pct, na.rm = TRUE)) %>%
+  ggplot(aes(x = factor(payment_type), y = avg_tip_pct)) +
+  geom_col() +
+  labs(
+    title = "Average Tip Percentage by Payment Type",
+    x = "Payment Type",
+    y = "Average Tip Percentage"
+  )
+
+# Tip % vs fare amount
+
+# Good way to create tip percent
+sampled_data_tipP_fareAmt <- sampled_data %>%
+  mutate(
+    tip_pct = if_else(fare_amount > 0, 100 * tip_amount / fare_amount, NA_real_)
+  )
+# Plot only valid rows
+tip_plot_data <- sampled_data_tipP_fareAmt %>%
+  filter(
+    !is.na(fare_amount),
+    !is.na(tip_pct),
+    is.finite(tip_pct),
+    fare_amount > 0
+  )
+
+ggplot(tip_plot_data, aes(x = fare_amount, y = tip_pct)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth(method = "lm", se = FALSE) +
+  coord_cartesian(ylim = c(0, 100)) +
+  labs(
+    title = "Tip Percentage vs Fare Amount",
+    x = "Fare Amount",
+    y = "Tip Percentage"
+  )
+```
+
+# EDA for Tipping Amount
+```{r}
+# Distribution of tip amount
+ggplot(sampled_data, aes(x = tip_amount)) +
+  geom_histogram(bins = 30) +
+  labs(
+    title = "Distribution of Tip Amount",
+    x = "Tip Amount",
+    y = "Count"
+  )
+# Tip amount by payment type
+ggplot(sampled_data, aes(x = factor(payment_type), y = tip_amount)) +
+  geom_boxplot() +
+  labs(
+    title = "Tip Amount by Payment Type",
+    x = "Payment Type",
+    y = "Tip Amount"
+  )
+# Tip amount by weekday
+ggplot(sampled_data, aes(x = pickup_weekday_name, y = tip_amount)) +
+  geom_boxplot() +
+  labs(
+    title = "Tip Amount by Pickup Weekday",
+    x = "Weekday",
+    y = "Tip Amount"
+  )
+# Tip amount vs fare amount
+ggplot(sampled_data, aes(x = fare_amount, y = tip_amount)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "Tip Amount vs Fare Amount",
+    x = "Fare Amount",
+    y = "Tip Amount"
+  )
+# Tip amount vs trip distance
+ggplot(sampled_data, aes(x = trip_distance, y = tip_amount)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "Tip Amount vs Trip Distance",
+    x = "Trip Distance",
+    y = "Tip Amount"
+  )
+# Tip amount vs trip duration
+ggplot(sampled_data, aes(x = trip_minutes, y = tip_amount)) +
+  geom_point(alpha = 0.4) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "Tip Amount vs Trip Duration",
+    x = "Trip Duration (minutes)",
+    y = "Tip Amount"
+  )
+## Comment: Two VERY LONG trips DRASTICALLY changed slope of regression line
+```
+
+
+# Looking at Correlation
+```{r}
+numeric_vars <- sampled_data %>%
+  select(
+    fare_amount,
+    trip_distance,
+    passenger_count,
+    extra,
+    pickup_hour,
+    dropoff_hour,
+    trip_minutes,
+    trip_speed_mph,
+    tip_amount
+  )
+
+cor_matrix <- cor(numeric_vars, use = "pairwise.complete.obs")
+cor_matrix
+
+# Heatmap Version
+library(corrplot)
+corrplot::corrplot(cor_matrix, method = "color", type = "upper")
+```
+
+# Possible First Regression Model
+```{r}
+fit_tip <- lm(
+  tip_amount ~ fare_amount + trip_distance + trip_minutes +
+    pickup_hour + pickup_weekday_name +
+    passenger_count + factor(payment_type) + extra + month,
+  data = sampled_data
+)
+
+summary(fit_tip)
+
+# Check Correlation by looking at VIF
+library(car)
+car::vif(fit_tip)
+```
+
+
+
+
+
+
