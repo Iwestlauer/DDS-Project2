@@ -6,6 +6,7 @@ How to get "zone" from location ID?
 
 What are the tip-related variables?
   1. season? do tourists tip better?
+  2. 
 
 What derived features could be useful? 
   such as the total distance vs total time - how quick was it for the distance 
@@ -17,6 +18,8 @@ where pickup locationID is not dropoff locationID
 
 How are we going to subset the data so we're not working with 50M+ observations?
   What size are we aiming for? idk
+  If we select and filter down to 25M observations, can we sample down to 10,000?
+  >> If data is ordered by time, naive slicing will introduce bias. Use random sampling to preserve distribution.
   Do meaningful filtering before doing stratification!! 
   (Don't accidentally get more data for one season than another.)
   

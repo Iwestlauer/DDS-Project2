@@ -1,0 +1,44 @@
+# Wednesday 4/8
+
+- moved selected borough to a separate variable, looking ahead to the 
+possibility of Rshiny app user selecting borough from a dropdown menu
+
+- added 4 more filters, which can be individually commented out:
+1.       # Both pickup and dropoff are in selected borough
+2.       # payment type is 1 (credit card)
+3.       # fare amount must be greater than 0
+4.       # pickup and dropoff cannot be the same datetime
+5.       # passenger count is not 
+
+? Should we replace passenger count NA with 0, 
+or should we also remove obs where passenger count = 0?
+
+- from the correlation heatmap, it looks like the correlation between tip amt
+and passenger ct is almost 0
+
+- I realized I was seeing some warning after the borough join 
+because I was not clearing my environment, 
+but we don't need to do the join if we're just filtering by zoneid
+
+- in "more data cleaning", trips_01 was not defined before it was used, so I didn't run that block,
+but you can see summary of missing in plot_missing(df_final)
+
+- introduced a naming convention for dataframes "df_" to make them clearer
+
+- put all mutates together
+
+- added "theme_taxi" for the plots, so they all go together visually,
+please feel free to edit it however you see fit
+
+- "Check Correlation by looking at VIF" What is this?
+
+- Why is tip amount highly correlated with trip minutes, and trip distance-- but not trip_speed_mph??
+
+
+
+
+
+
+
+
+
