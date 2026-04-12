@@ -41,6 +41,31 @@ please feel free to edit it however you see fit
 
 - add a column to indicate tourist season where month = 7, 10, 11, 12 because avg tip is higher
 
+- top 3 insights from EDA: trip distance is correlated with tip amount, 
+Tip amount vs tourist season - higher amounts are more common in tourist season
+
+- I don't think trip speed is useful at all
+
+- investigate initial model - high leverage/high residual
+the assumptions for linear regression are not met
+
+- try a piecewise model where the linear regressions fit to the tip amt
+greater than 0
+
+
+- to build the model, we filtered the outliers from below the 1st and above the 99th percentile 
+for the tip amount, fare amount, trip minutes, and trip distance
+- we fitted the model and ran predictions on log(tip amount) but transformed it back
+and evaluated the model on tip_amount on the dollar scale
+
+- defend selection, filtering, mutations
+
+- We decided not to do a piecewise model, because we couldn't fit a model to the 
+data where tip amount = 0. So, our lm only fits to tip amount >0 (ask dr.Sadler
+about this in live session tomorrow)
+
+
+
 
 
 
