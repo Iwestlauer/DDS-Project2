@@ -1,12 +1,11 @@
 ---
-title: "Initial EDA 3"
-author: "Isabella and Josh"
-date: "2026-04-09"
+title: "Project V1"
+author: "Josh"
+date: "2026-04-12"
 output: html_document
 editor_options: 
   chunk_output_type: console
 ---
-
 
 # Libraries
 Several R libraries were used for EDA, plotting, file operations, linear regression modeling, etc.
@@ -175,7 +174,6 @@ df_final %>%
 
 # Plots
 ```{r}
-
 theme_taxi <- function() {
   theme_minimal(base_size = 14) +
     theme(
@@ -242,18 +240,6 @@ ggplot(df_final, aes(x = trip_distance, y = tip_pct)) +
                   ylim = c(0, 100)) +
   theme_taxi()
 
-# Average tip percentage by payment type
-# df_final %>%
-#   group_by(payment_type) %>%
-#   summarise(avg_tip_pct = mean(tip_pct, na.rm = TRUE)) %>%
-#   ggplot(aes(x = factor(payment_type), y = avg_tip_pct)) +
-#   geom_col() +
-#   labs(
-#     title = "Average Tip Percentage by Payment Type",
-#     x = "Payment Type",
-#     y = "Average Tip Percentage"
-#   )
-
 # Tip % vs fare amount
 ggplot(df_final, aes(x = fare_amount, y = tip_pct)) +
   geom_point(alpha = 0.1, shape = "o") +
@@ -287,19 +273,6 @@ ggplot(df_final, aes(x = tip_amount)) +
     y = "Count"
   ) + 
   theme_taxi()
-
-# # Tip amount by payment type
-# ggplot(df_final, aes(x = factor(payment_type), y = tip_amount)) +
-#   geom_boxplot() +
-#   labs(
-#     title = "Tip Amount by Payment Type",
-#     x = "Payment Type",
-#     y = "Tip Amount"
-#   )
-
-
-
-# df_sample <- df[sample(nrow(df_final), 100), ]
 
 # Tip amount vs fare amount
 ggplot(df_final, aes(x = fare_amount, y = tip_amount)) +
@@ -378,7 +351,6 @@ ggplot(df_final, aes(x = trip_minutes, y = tip_amount)) +
   ) +
   theme_taxi()
 ## Comment: Two VERY LONG trips DRASTICALLY changed slope of regression line
-
 ```
 
 # See how tip amount varies over time
@@ -442,12 +414,8 @@ df_final %>%
   theme_taxi()
 ```
 
-``` {r}
 
-```
-
-
-# Looking at Correlation
+# Looking at Correlation Among Numerical Predictors
 ```{r}
 numeric_vars <- df_final %>%
   select(
@@ -472,36 +440,13 @@ corrplot::corrplot(cor_matrix, method = "color", type = "upper")
 plot_correlation(numeric_vars)
 ```
 
-# Possible First Regression Model
-```{r}
-fit_tip <- lm(
-  tip_amount ~ fare_amount + 
-    trip_distance + 
-    trip_minutes +
-    pickup_hour + 
-    pickup_weekday_name +
-    extra + month,
-  data = df_final
-)
 
-summary(fit_tip)
+# MODELING
 
-# Checks for multicolinearity among predictors by looking at VIF
-library(car)
-car::vif(fit_tip)
-```
-
-
-
-
-### MODELING
-
-
-# Model 1 (ROUGH)
+### Cleaning
 ```{r}
 # Listing Columns
 names(df_final)
-
 
 # Clean obvious bad records before modeling
 # these are already filtered in df_final (see histograms in skim section)
@@ -524,66 +469,35 @@ df_model1 = df_clean %>%
   select(tip_amount,
          fare_amount,
          trip_distance,
-         # month,
          extra,
          trip_minutes,
-         # tourist_season,
+         # month,
+         # tourist_season
          )
+```
 
-
-
-# MODEL 1
+### MODEL 1
+```{r}
 # log1p does log(1+x) so it helps when vairable is 0
 # but now doing just log
+
 fit1 <- lm(log(tip_amount)~fare_amount + I(fare_amount^2) +
     trip_distance + extra + trip_minutes, data = df_model1)
 summary(fit1)
 
+# trip_distance & trip_minutes are not seen as significant predictors so we will remove
+
 fit1 <- lm(log(tip_amount)~fare_amount + I(fare_amount^2)  + extra, data = df_model1)
 summary(fit1)
-
 
 # Assumptions
 par(mfrow = c(2, 2))
 plot(fit1)
 par(mfrow = c(1, 1))
 
-
-# # RMSE
-# rmse = sqrt(mean(residuals(fit1)^2))
-# rmse
-# 
-# # MAE
-# mae = mean(abs(residuals(fit1)))
-# mae
-# 
-# 
-# ## DF_TYPICAL MODEL
-# df_typical <- df_final %>%
-#   mutate(tip_pct = tip_amount / fare_amount) %>%
-#   filter(
-#     tip_amount > 0,
-#     fare_amount > 0,
-#     trip_distance > 0,
-#     trip_minutes > 0,
-#     between(fare_amount, quantile(fare_amount, 0.01), quantile(fare_amount, 0.99)),
-#     between(trip_distance, quantile(trip_distance, 0.01), quantile(trip_distance, 0.99)),
-#     between(trip_minutes, quantile(trip_minutes, 0.01), quantile(trip_minutes, 0.99)),
-#     between(tip_pct, quantile(tip_pct, 0.01), quantile(tip_pct, 0.99))
-#   )
-# 
-# # Model 2
-# fit2 <- lm(
-#   log(tip_amount) ~ fare_amount + I(fare_amount^2) + extra,
-#   data = df_typical
-# )
-# summary(fit2)
-
-# # Assumptions
-# par(mfrow = c(2, 2))
-# plot(fit2)
-# par(mfrow = c(1, 1))
-
+# Outliers
+df_o = df_final[c(5313),] 
+# investigated outlier, but tip amt / % seems to be reaonsable based on fare_amount. Nothing esle seemed out of the ordinary. 
 
 # predicted values on log scale
 pred_log <- predict(fit1)
@@ -599,14 +513,68 @@ rmse
 mae <- mean(abs(df_model1$tip_amount - pred_tip))
 mae
 
-# Outliers
-df_o = df_final[c(5313),] 
-# investigated outlier, but tip amt / % seems to be reaonsable based on fare_amount. Nothing esle seemed out of the ordinary. 
+```
 
+
+### MODEL 2 - Cleaning for Typical Cases
+```{r}
+df_typical <- df_final %>%
+  mutate(tip_pct = tip_amount / fare_amount) %>%
+  filter(
+    tip_amount > 0,
+    fare_amount > 0,
+    trip_distance > 0,
+    trip_minutes > 0,
+    between(fare_amount, quantile(fare_amount, 0.01), quantile(fare_amount, 0.99)),
+    between(trip_distance, quantile(trip_distance, 0.01), quantile(trip_distance, 0.99)),
+    between(trip_minutes, quantile(trip_minutes, 0.01), quantile(trip_minutes, 0.99)),
+    between(tip_pct, quantile(tip_pct, 0.01), quantile(tip_pct, 0.99))
+  )
+
+fit2 <- lm(
+  log(tip_amount) ~ fare_amount + I(fare_amount^2) + extra,
+  data = df_typical
+)
+summary(fit2)
+
+# Assumptions
+par(mfrow = c(2, 2))
+plot(fit2)
+par(mfrow = c(1, 1))
+
+
+# predicted values on log scale
+pred_log <- predict(fit2)
+
+# back-transform to original dollar scale
+pred_tip <- exp(pred_log)
+
+# RMSE on original scale
+rmse <- sqrt(mean((df_typical$tip_amount - pred_tip)^2))
+rmse
+
+# MAE on original scale
+mae <- mean(abs(df_typical$tip_amount - pred_tip))
+mae
 ```
 
 
 
-
-
+# FOR RAG:
+DATA CLEANING
+- For our dataset, we are looking at a random sample of 10,008 observations from the NYC Yellow Taxi Trip data for 2025. We randomly sampled 834 observations from each of the months
+- We are only looking at data from the following Borough(s): [Manhattan, Queens]. We have the ability to look at other boroughs in the future
+- Given credit card was the overwhelming choice for payment_type, we filtered our data set to only look at credit card payments
+- Passenger Count is driver-reported so when driver doesnt report count, it will
+be a NA. It is commonly understood that when passenger_count is over 1, passengers are less likley to take responsibility to tip. Given these factors, we filtered our dataset to just look at observations where the passenger count was equal to 1. 
+- Because airport trips often involve unique fare structures, longer travel distances, and different rider tipping behavior than typical city taxi rides, it is reasonable to exclude them and focus the analysis on non-airport trips so the model reflects a more consistent and representative set of everyday taxi rides.
+PLOTS
+- Wanted to take detail look at tip percentage (tip %)
+- The distribution of tip percentage is heavily right-skewed, with most rides having tip percentages in a moderate range and a small number of rides exhibiting unusually large tip percentages. This long right tail suggests the presence of outliers and indicates that tip percentage is not normally distributed.
+- Distribution of tip percentage (tip %) appears relatively consistent throughoout each day of the week
+- Appears to be a negative, nonlinear association between fare amount and tip percentage. For smaller fares, tip percentages are much more spread out and can be quite large, while for larger fares, tip percentages tend to be lower and more tightly clustered. This pattern suggests that riders often leave disproportionately high percentage tips on very small fares, whereas tip percentages become more consistent at more moderate levels as fare amount increases.
+- Distribution of tip amount appears to be right-skewed. This indicates that small to moderate tips are common, while relatively large tips occur much less frequently.
+- Tip amount generally increases as fare amount increases, showing a positive association between the two variables. However, the spread in tip amount also increases for larger fares, and there are several zero-tip rides and some unusually large tips present. Due to the several zero-tip rides across nearly all values for fare amount, we decided to only analyze rides where tip amount was greater than 0. 
+- The scatterplot suggests a positive, roughly linear association between trip distance and tip amount, with longer trips generally corresponding to larger tips. Most observations are concentrated among shorter trips with smaller tips, while the spread in tip amount increases as trip distance increases. The plot also shows many rides with zero or very small tips across distances, along with a few unusually large tips that may be considered outliers. A similar case is present with tip amount vs trip duration. 
+- 
 
