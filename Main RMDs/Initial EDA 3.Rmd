@@ -39,7 +39,7 @@ zone_lookup <- read.csv(here("Additional Data", "NYC_Taxi_Zones.csv"))
 ```
 
 #### Selection
-11 of 20 columns were selected; Columns not selected: VendorID, RatecodeID, store_and_fwd_flag, mta_tax, tolls_amount, improvement surcharge, congestion_surcharge, airport_fee, cbd_congestion_fee
+11 of 20 columns were selected; Columns not selected: VendorID, RatecodeID, store_and_fwd_flag, mta_tax, tolls_amount, improvement surcharge, congestion_surcharge, airport_fee, cbd_congestion_fee, passenger_count
 
 #### Filters
 
@@ -68,13 +68,14 @@ df_sampled <- map_dfr(files, function(f) {
       "tpep_dropoff_datetime",
       "fare_amount",
       "trip_distance",
-      # "passenger_count",
       "tip_amount",
       "total_amount",
       "PULocationID",
       "DOLocationID",
       "payment_type",
-      "extra"
+      "extra",
+      "passenger_count",
+      "Airport_fee"
     )
   )
   
@@ -91,6 +92,8 @@ df_sampled <- map_dfr(files, function(f) {
       tpep_pickup_datetime != tpep_dropoff_datetime,
       # passenger count is not NA
       # !is.na(passenger_count)
+      passenger_count == 1,
+      Airport_fee == 0 # cutting out airport trips
     ) %>%
     ## 25,386,827 = over 25M observations after filtering
     # Take an even sample from each file/month
@@ -114,7 +117,7 @@ df_final <- df_sampled %>%
   mutate(
     # feature engineering from pickup and dropoff datetime
     month = month(tpep_pickup_datetime),
-    tourist_season = ifelse(month %in% c(7, 10, 11, 12), '1', '0'),
+    tourist_season = as.factor(ifelse(month %in% c(7, 10, 11, 12), '1', '0')),
     pickup_time = ymd_hms(tpep_pickup_datetime),
     dropoff_time = ymd_hms(tpep_dropoff_datetime),
     pickup_hour = hour(pickup_time),
@@ -158,7 +161,7 @@ hist(df_final$trip_distance)
 plot(df_final$PULocationID, df_final$tip_amount)
 plot(df_final$tourist_season, df_final$tip_amount)
 plot(df_final$trip_speed_mph, df_final$tip_amount)
-plot(df_final$passenger_count, df_final$tip_amount)
+# plot(df_final$passenger_count, df_final$tip_amount)
 
 # look at tip percent in df final
 df_final %>%
@@ -222,7 +225,7 @@ ggplot(df_final, aes(x = pickup_weekday_name, y = tip_pct)) +
   theme_taxi()
 
 # Tip percentage vs trip distance
-ggplot(df_clean, aes(x = trip_distance, y = tip_pct)) +
+ggplot(df_final, aes(x = trip_distance, y = tip_pct)) +
   geom_point(alpha = 0.1, shape = "o") +
   geom_smooth(method = "lm",
               formula = y ~ splines::bs(x, 3),
@@ -424,21 +427,20 @@ numeric_vars <- df_final %>%
   select(
     fare_amount,
     trip_distance,
-    passenger_count,
     extra,
     pickup_hour,
     dropoff_hour,
     trip_minutes,
     trip_speed_mph,
     tip_amount,
-    pickup_weekday_num
+    pickup_weekday_num,
+    # tourist_season
   )
 
 cor_matrix <- cor(numeric_vars, use = "pairwise.complete.obs")
 cor_matrix
 
 # Heatmap Version
-library(corrplot)8
 corrplot::corrplot(cor_matrix, method = "color", type = "upper")
 
 plot_correlation(numeric_vars)
@@ -477,15 +479,16 @@ names(df_final)
 
 # Clean obvious bad records before modeling
 # these are already filtered in df_final (see histograms in skim section)
-# df_clean <- df_final %>%
-#   filter(
-#     tip_amount >= 0,
-#     fare_amount > 0,
-#     trip_distance >= 0,
-#     trip_minutes > 0
-#   )
+df_clean <- df_final %>%
+  filter(
+    tip_amount > 0,
+    tip_amount < quantile(tip_amount, 0.99),
+    fare_amount > 0,
+    trip_distance > 0,
+    trip_minutes > 0
+  )
 
- df_clean = df_final %>% mutate(
+ df_clean = df_clean %>% mutate(
     month = factor(month),
     pickup_hour = factor(pickup_hour),
     pickup_weekday_name = factor(pickup_weekday_name, ordered = FALSE))
@@ -495,16 +498,18 @@ df_model1 = df_clean %>%
   select(tip_amount,
          fare_amount,
          trip_distance,
-         month,
+         # month,
          extra,
          trip_minutes,
+         # tourist_season,
          )
 
 
 # MODEL 1
 # log1p does log(1+x) so it helps when vairable is 0
 # but now doing just log
-fit1 <- lm(log1p(tip_amount) ~., data = df_model1)
+fit1 <- lm(log(tip_amount)~fare_amount + I(fare_amount^2) +
+    trip_distance + extra + trip_minutes, data = df_model1)
 summary(fit1)
 
 # Assumptions
@@ -520,6 +525,18 @@ rmse
 # MAE
 mae = mean(abs(residuals(fit1)))
 mae
+
+
+# Model 2
+fit2 <- lm(
+  log(tip_amount) ~ fare_amount + I(fare_amount^2) + extra,
+  data = df_model1
+)
+summary(fit2)
+
+
+# Outliers
+df_o = df_final[c(4000, 10000, 4998),] 
 
 ```
 
