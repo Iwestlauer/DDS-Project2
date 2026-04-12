@@ -505,6 +505,7 @@ df_model1 = df_clean %>%
          )
 
 
+
 # MODEL 1
 # log1p does log(1+x) so it helps when vairable is 0
 # but now doing just log
@@ -512,31 +513,71 @@ fit1 <- lm(log(tip_amount)~fare_amount + I(fare_amount^2) +
     trip_distance + extra + trip_minutes, data = df_model1)
 summary(fit1)
 
+fit1 <- lm(log(tip_amount)~fare_amount + I(fare_amount^2)  + extra, data = df_model1)
+summary(fit1)
+
+
 # Assumptions
 par(mfrow = c(2, 2))
 plot(fit1)
 par(mfrow = c(1, 1))
 
 
-# RMSE
-rmse = sqrt(mean(residuals(fit1)^2))
+# # RMSE
+# rmse = sqrt(mean(residuals(fit1)^2))
+# rmse
+# 
+# # MAE
+# mae = mean(abs(residuals(fit1)))
+# mae
+# 
+# 
+# ## DF_TYPICAL MODEL
+# df_typical <- df_final %>%
+#   mutate(tip_pct = tip_amount / fare_amount) %>%
+#   filter(
+#     tip_amount > 0,
+#     fare_amount > 0,
+#     trip_distance > 0,
+#     trip_minutes > 0,
+#     between(fare_amount, quantile(fare_amount, 0.01), quantile(fare_amount, 0.99)),
+#     between(trip_distance, quantile(trip_distance, 0.01), quantile(trip_distance, 0.99)),
+#     between(trip_minutes, quantile(trip_minutes, 0.01), quantile(trip_minutes, 0.99)),
+#     between(tip_pct, quantile(tip_pct, 0.01), quantile(tip_pct, 0.99))
+#   )
+# 
+# # Model 2
+# fit2 <- lm(
+#   log(tip_amount) ~ fare_amount + I(fare_amount^2) + extra,
+#   data = df_typical
+# )
+# summary(fit2)
+
+# # Assumptions
+# par(mfrow = c(2, 2))
+# plot(fit2)
+# par(mfrow = c(1, 1))
+
+
+# predicted values on log scale
+pred_log <- predict(fit1)
+
+# back-transform to original dollar scale
+pred_tip <- exp(pred_log)
+
+# RMSE on original scale
+rmse <- sqrt(mean((df_model1$tip_amount - pred_tip)^2))
 rmse
 
-# MAE
-mae = mean(abs(residuals(fit1)))
+# MAE on original scale
+mae <- mean(abs(df_model1$tip_amount - pred_tip))
 mae
 
 
-# Model 2
-fit2 <- lm(
-  log(tip_amount) ~ fare_amount + I(fare_amount^2) + extra,
-  data = df_model1
-)
-summary(fit2)
-
 
 # Outliers
-df_o = df_final[c(4000, 10000, 4998),] 
+df_o = df_final[c(5313),] 
+# investigated outlier, but tip amt / % seems to be reaonsable based on fare_amount. Nothing esle seemed out of the ordinary. 
 
 ```
 
