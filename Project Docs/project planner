@@ -17,6 +17,17 @@ done	Import the PARQUET files into R using arrow.
 9.	Present both your findings and your model clearly.
 ####GOAL: finish initial prediction model by Monday 4/13
 
+
+
+TODO Monday 4/13 through Thursday 4/16
+--compose documents to feed to RAG -at least answer top 10 FAQ (Josh, aim for Sun 4/12)
+--put together the most simple minimal RAG possible (Isabella, before live session Mon 4/13)
+--Monday after live session night meeting to test RAG
+--Tuesday meeting to put together a basic Rshiny with some project findings + interactive plots
+--Wednesday meeting incorporate RAG into Rshiny - add RAG to PPT (finish PPT)
+--Thursday finish everything (polish deliverables and record presentation) before 8:30pm
+
+
 10.	Build an RShiny dashboard to communicate your findings. 
 ####GOAL: finish RShiny and Initial Presentation Deck by Wednesday 4/15
     
@@ -24,8 +35,11 @@ done	Import the PARQUET files into R using arrow.
 12.	Test the app to make sure the responses are useful and connected to your actual analysis.
 ####GOAL: finish NLP/RAG and video recording by Friday 4/17
 
-Josh Stat oral exam Fri 4/17
+Josh Stat oral exam Fri 4/17 after 5pm
 Josh Stat Exam Sat 4/18
+Josh busy all day Saturday 4/19
+
+Ideally, finish project completely by Friday.
     
 ####GOAL: finish polishing project by Sunday 4/19
 
