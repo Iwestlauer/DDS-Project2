@@ -5,4 +5,25 @@ be a NA
 observations where its NA 
 - In our sampled data, there are a few rows where pickup time and drop off time
 are the exact same time stamp. Therefore trip_minutes = 0, and trip_speed_mph = Inf
-- 
+
+
+# Saturday 4/11
+- Looking at Initial EDA 3
+> EDA Plots look good, but maybe we should change the "." style to traditional
+because I feel like it's harder to see the individual points (and spread) when 
+we plot
+- Given the correlation between tip amt and passenger count is nearly 0, I
+think we should remove passenger count from being a predictor? instead of 
+removing all of those possible meaningful observations.
+- Sorry I meant that we can check for multicollinearity among predictors by looking
+at VIF. NOT correlation. VIF stands for variance inflation factor. 
+- Reasons for why trip_speed_mph is barely correlated
+> A ratio can cancel the size effect
+>> Long trip, long time → high tip possible
+>> Short trip, short time → low tip possible
+>> Both could have similar speed
+> Distance and time both contribute to fare, but speed does not directly
+> High speed is not inherently “better” for tipping
+- At bottom Initial EDA 3, I added a Modeling section and was testing out linear model
+> assumptions still dont look great even after some transformations and cleaning. 
+> Going to look a lot more into this tomorrow. 

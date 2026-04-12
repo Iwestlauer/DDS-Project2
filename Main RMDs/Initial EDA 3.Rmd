@@ -214,23 +214,23 @@ ggplot(df_final, aes(x = pickup_weekday_name, y = tip_pct)) +
   )+
   theme_taxi()
 
-# Tip percentage vs trip distance
-ggplot(df_clean, aes(x = trip_distance, y = tip_pct)) +
-  geom_point(alpha = 0.8, shape = ".") +
-  geom_smooth(method = "lm", 
-              formula = y ~ splines::bs(x, 3), 
-              linewidth = 0.9,
-              color = "black",
-              linetype = "dashed",
-              se = FALSE) +
-  labs(
-    title = "Tip Percentage vs Trip Distance",
-    x = "Trip Distance (miles)",
-    y = "Tip Percentage"
-  )+
-  coord_cartesian(xlim = c(0, 10),
-                  ylim = c(0, 100)) +
-  theme_taxi()
+# # Tip percentage vs trip distance
+# ggplot(df_clean, aes(x = trip_distance, y = tip_pct)) +
+#   geom_point(alpha = 0.8, shape = ".") +
+#   geom_smooth(method = "lm", 
+#               formula = y ~ splines::bs(x, 3), 
+#               linewidth = 0.9,
+#               color = "black",
+#               linetype = "dashed",
+#               se = FALSE) +
+#   labs(
+#     title = "Tip Percentage vs Trip Distance",
+#     x = "Trip Distance (miles)",
+#     y = "Tip Percentage"
+#   )+
+#   coord_cartesian(xlim = c(0, 10),
+#                   ylim = c(0, 100)) +
+#   theme_taxi()
 
 # Average tip percentage by payment type
 # df_final %>%
@@ -377,7 +377,7 @@ cor_matrix <- cor(numeric_vars, use = "pairwise.complete.obs")
 cor_matrix
 
 # Heatmap Version
-library(corrplot)
+library(corrplot)8
 corrplot::corrplot(cor_matrix, method = "color", type = "upper")
 
 plot_correlation(numeric_vars)
@@ -394,7 +394,65 @@ fit_tip <- lm(
 
 summary(fit_tip)
 
-# Check Correlation by looking at VIF
+# Checks for multicolinearity among predictors by looking at VIF
 library(car)
 car::vif(fit_tip)
 ```
+
+
+
+
+### MODELING
+
+
+# Model 1 (ROUGH)
+```{r}
+# Listing Columns
+names(df_final)
+
+
+# Clean obvious bad records before modeling
+df_clean <- df_final %>%
+  filter(
+    tip_amount >= 0,
+    fare_amount > 0,
+    trip_distance >= 0,
+    trip_minutes > 0
+  )
+
+ df_clean = df_clean %>% mutate(
+    month = factor(month),
+    pickup_hour = factor(pickup_hour),
+    pickup_weekday_name = factor(pickup_weekday_name, ordered = FALSE))
+
+# Creating DF subset
+df_model1 = df_clean %>% select(-tpep_pickup_datetime, -tpep_dropoff_datetime, -passenger_count, -PULocationID, -DOLocationID, -payment_type, -source_file, -pickup_time, -dropoff_time, -pickup_date, -dropoff_date, -pickup_weekday_num, -dropoff_hour, -dropoff_weekday_num, -dropoff_weekday_name, -total_amount, -tip_pct, -trip_speed_mph)
+
+
+# MODEL 1
+# log1p does log(1+x) so it helps when vairable is 0
+# but now doing just log
+fit1 <- lm(log1p(tip_amount) ~., data = df_model1)
+summary(fit1)
+
+# Assumptions
+par(mfrow = c(2, 2))
+plot(fit1)
+par(mfrow = c(1, 1))
+
+
+# RMSE
+rmse = sqrt(mean(residuals(fit1)^2))
+rmse
+
+# MAE
+mae = mean(abs(residuals(fit1)))
+mae
+
+```
+
+
+
+
+
+
