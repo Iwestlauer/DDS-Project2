@@ -10,6 +10,10 @@ done	Import the PARQUET files into R using arrow.
 
 7.	Build a prediction model for tip amount. 
 8.	Check whether your model meets the RMSE and MAE thresholds. 
+
+    Goal is: Your prediction model must achieve at least:
+    RMSE ≤ 2 and MAE ≤ 1.5 
+
 9.	Present both your findings and your model clearly.
 ####GOAL: finish initial prediction model by Monday 4/13
 

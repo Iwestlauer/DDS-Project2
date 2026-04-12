@@ -29,6 +29,14 @@ https://www.nyc.gov/site/tlc/about/tlc-trip-record-data.page
 
 #### Ingestion
 Read in all raw data from 12 parquet files, then read Taxi Zone Lookup file from https://catalog.data.gov/dataset/nyc-taxi-zones-131e4
+```{r}
+files <- list.files(here("Main data"), pattern = "\\.parquet$", full.names = TRUE)
+# get the number of observations
+# dim(df_raw)[1] #48,722,602 Over 48M for Jan-Dec 2025
+
+# Read in taxi zone lookup
+zone_lookup <- read.csv(here("Additional Data", "NYC_Taxi_Zones.csv"))
+```
 
 #### Selection
 11 of 20 columns were selected; Columns not selected: VendorID, RatecodeID, store_and_fwd_flag, mta_tax, tolls_amount, improvement surcharge, congestion_surcharge, airport_fee, cbd_congestion_fee
@@ -39,18 +47,11 @@ Read in all raw data from 12 parquet files, then read Taxi Zone Lookup file from
 Data is sampled down to a target n, with an even number of samples from each month
 
 ```{r}
-files <- list.files(here("Main data"), pattern = "\\.parquet$", full.names = TRUE)
-# get the number of observations
-# dim(df_raw)[1] #48,722,602 Over 48M for Jan-Dec 2025
-
-# Read in taxi zone lookup
-zone_lookup <- read.csv(here("Additional Data", "NYC_Taxi_Zones.csv"))
-
 # Get the Location IDs that belong to the selected borough
 # Note: this may be a dropdown selection in the RShiny app
-selected_borough <- "Manhattan"
+selected_boroughs <- c("Manhattan", "Queens")
 zone_ids <- zone_lookup %>%
-  filter(Borough == selected_borough) %>%
+  filter(Borough %in% selected_boroughs) %>%
   pull(Location.ID)
 
 # use scientific notation so we can easily change order of magnitude
@@ -67,7 +68,7 @@ df_sampled <- map_dfr(files, function(f) {
       "tpep_dropoff_datetime",
       "fare_amount",
       "trip_distance",
-      "passenger_count",
+      # "passenger_count",
       "tip_amount",
       "total_amount",
       "PULocationID",
@@ -78,7 +79,6 @@ df_sampled <- map_dfr(files, function(f) {
   )
   
   df %>%
-    # Keep only trips where both pickup and dropoff are in Manhattan
     filter(
       # Both pickup and dropoff are in selected borough
       PULocationID %in% zone_ids,
@@ -90,7 +90,7 @@ df_sampled <- map_dfr(files, function(f) {
       # pickup and dropoff cannot be the same datetime
       tpep_pickup_datetime != tpep_dropoff_datetime,
       # passenger count is not NA
-      !is.na(passenger_count)
+      # !is.na(passenger_count)
     ) %>%
     ## 25,386,827 = over 25M observations after filtering
     # Take an even sample from each file/month
@@ -114,6 +114,7 @@ df_final <- df_sampled %>%
   mutate(
     # feature engineering from pickup and dropoff datetime
     month = month(tpep_pickup_datetime),
+    tourist_season = ifelse(month %in% c(7, 10, 11, 12), '1', '0'),
     pickup_time = ymd_hms(tpep_pickup_datetime),
     dropoff_time = ymd_hms(tpep_dropoff_datetime),
     pickup_hour = hour(pickup_time),
@@ -150,6 +151,12 @@ str(df_final)
 # see counts of each level in passenger_count
 table(df_final$passenger_count)
 hist(df_final$trip_speed_mph)
+hist(df_final$fare_amount)
+hist(df_final$tip_amount)
+hist(df_final$trip_minutes)
+hist(df_final$trip_distance)
+plot(df_final$PULocationID, df_final$tip_amount)
+plot(df_final$tourist_season, df_final$tip_amount)
 plot(df_final$trip_speed_mph, df_final$tip_amount)
 plot(df_final$passenger_count, df_final$tip_amount)
 
@@ -179,7 +186,7 @@ theme_taxi <- function() {
       axis.text = element_text(color = "black"),
       
       axis.line = element_line(color = "black"),
-      legend.position = "none"
+      legend.position = "top"
     )
 }
 
@@ -214,23 +221,23 @@ ggplot(df_final, aes(x = pickup_weekday_name, y = tip_pct)) +
   )+
   theme_taxi()
 
-# # Tip percentage vs trip distance
-# ggplot(df_clean, aes(x = trip_distance, y = tip_pct)) +
-#   geom_point(alpha = 0.8, shape = ".") +
-#   geom_smooth(method = "lm", 
-#               formula = y ~ splines::bs(x, 3), 
-#               linewidth = 0.9,
-#               color = "black",
-#               linetype = "dashed",
-#               se = FALSE) +
-#   labs(
-#     title = "Tip Percentage vs Trip Distance",
-#     x = "Trip Distance (miles)",
-#     y = "Tip Percentage"
-#   )+
-#   coord_cartesian(xlim = c(0, 10),
-#                   ylim = c(0, 100)) +
-#   theme_taxi()
+# Tip percentage vs trip distance
+ggplot(df_clean, aes(x = trip_distance, y = tip_pct)) +
+  geom_point(alpha = 0.1, shape = "o") +
+  geom_smooth(method = "lm",
+              formula = y ~ splines::bs(x, 3),
+              linewidth = 0.9,
+              color = "black",
+              linetype = "dashed",
+              se = FALSE) +
+  labs(
+    title = "Tip Percentage vs Trip Distance",
+    x = "Trip Distance (miles)",
+    y = "Tip Percentage"
+  )+
+  coord_cartesian(xlim = c(0, 10),
+                  ylim = c(0, 100)) +
+  theme_taxi()
 
 # Average tip percentage by payment type
 # df_final %>%
@@ -245,11 +252,9 @@ ggplot(df_final, aes(x = pickup_weekday_name, y = tip_pct)) +
 #   )
 
 # Tip % vs fare amount
-
 ggplot(df_final, aes(x = fare_amount, y = tip_pct)) +
-  geom_point(alpha = 0.8, shape = ".") +
+  geom_point(alpha = 0.1, shape = "o") +
   geom_smooth(
-    # method = "lm", 
               # formula = y ~ splines::bs(x, 2), 
               linewidth = 0.9,
               color = "black",
@@ -289,20 +294,10 @@ ggplot(df_final, aes(x = tip_amount)) +
 #     y = "Tip Amount"
 #   )
 
-# Tip amount by weekday
-ggplot(df_final, aes(x = pickup_weekday_name, y = tip_amount)) +
-  geom_boxplot() +
-  labs(
-    title = "Tip Amount by Pickup Weekday",
-    x = "Weekday",
-    y = "Tip Amount"
-  ) +
-  theme_taxi()
-
 # Tip amount vs fare amount
 ggplot(df_final, aes(x = fare_amount, y = tip_amount)) +
-  geom_point(alpha = 0.4,
-             shape = ".") +
+  geom_point(alpha = 0.1,
+             shape = "o") +
   geom_smooth(method = "lm",
               linewidth = 0.9,
               color = "black",
@@ -319,8 +314,8 @@ ggplot(df_final, aes(x = fare_amount, y = tip_amount)) +
 
 # Tip amount vs trip distance
 ggplot(df_final, aes(x = trip_distance, y = tip_amount)) +
-  geom_point(alpha = 0.4,
-             shape = ".") +
+  geom_point(alpha = 0.1,
+             shape = "o") +
   geom_smooth(method = "lm",
               linewidth = 0.9,
               color = "black",
@@ -337,8 +332,8 @@ ggplot(df_final, aes(x = trip_distance, y = tip_amount)) +
 
 # Tip amount vs trip duration
 ggplot(df_final, aes(x = trip_minutes, y = tip_amount)) +
-  geom_point(alpha = 0.4,
-             shape = ".") +
+  geom_point(alpha = 0.1,
+             shape = "o") +
   geom_smooth(method = "lm",
               formula = y ~ splines::bs(x, 2),
               linewidth = 0.9,
@@ -354,6 +349,72 @@ ggplot(df_final, aes(x = trip_minutes, y = tip_amount)) +
   ) +
   theme_taxi()
 ## Comment: Two VERY LONG trips DRASTICALLY changed slope of regression line
+
+```
+
+# See how tip amount varies over time
+```{r}
+# Tip amount by weekday
+ggplot(df_final, aes(x = pickup_weekday_name, y = tip_amount)) +
+  geom_boxplot() +
+  labs(
+    title = "Tip Amount by Pickup Weekday",
+    x = "Weekday",
+    y = "Tip Amount"
+  ) +
+  theme_taxi()
+
+# Tip amount by month
+df_final %>%
+  group_by(month) %>%
+  summarise(avg_tip_amt = mean(tip_amount, na.rm = TRUE)) %>%
+  ggplot(aes(x = factor(month), y = avg_tip_amt)) +
+  geom_col() +
+  labs(
+    title = "Average Tip Amount by Month",
+    x = "Month",
+    y = "Average Tip Amount"
+  )+
+  theme_taxi()
+```
+
+# Look at Tourist Season: July, Oct-Dec
+```{r}
+# Tip amount vs tourist season
+df_final %>%
+  group_by(tourist_season) %>%
+  summarise(avg_tip_amt = mean(tip_amount, na.rm = TRUE)) %>%
+  ggplot(aes(x = factor(tourist_season), y = avg_tip_amt)) +
+  geom_col() +
+  labs(
+    title = "Average Tip Amount by Tourist Season",
+    x = "Tourist Season",
+    y = "Average Tip Amount"
+  )+
+  theme_taxi()
+
+# Tip amount vs tourist season - higher amounts are more common in tourist season
+df_final %>%
+  ggplot(aes(x = tip_amount, color = factor(tourist_season))) +
+  geom_density(linewidth = 0.75) +
+  labs(
+    title = "Tip Amount Dist in Tourist Season vs Off-Season",
+    x = "Tip Amount",
+    color = "Tourist Season"
+  ) +
+  theme_taxi()
+
+# Tip percent vs tourist season - does not seem to vary by tourist season
+df_final %>%
+  ggplot(aes(x = tip_pct, color = factor(tourist_season))) +
+  geom_density(linewidth = 0.75) +
+  ggtitle("Tip Percent Dist in Tourist Season vs Off-Season") +
+  xlab("Tip Percent") +
+  theme_taxi()
+```
+
+``` {r}
+
 ```
 
 
@@ -386,8 +447,11 @@ plot_correlation(numeric_vars)
 # Possible First Regression Model
 ```{r}
 fit_tip <- lm(
-  tip_amount ~ fare_amount + trip_distance + trip_minutes +
-    pickup_hour + pickup_weekday_name +
+  tip_amount ~ fare_amount + 
+    trip_distance + 
+    trip_minutes +
+    pickup_hour + 
+    pickup_weekday_name +
     extra + month,
   data = df_final
 )
@@ -412,21 +476,29 @@ names(df_final)
 
 
 # Clean obvious bad records before modeling
-df_clean <- df_final %>%
-  filter(
-    tip_amount >= 0,
-    fare_amount > 0,
-    trip_distance >= 0,
-    trip_minutes > 0
-  )
+# these are already filtered in df_final (see histograms in skim section)
+# df_clean <- df_final %>%
+#   filter(
+#     tip_amount >= 0,
+#     fare_amount > 0,
+#     trip_distance >= 0,
+#     trip_minutes > 0
+#   )
 
- df_clean = df_clean %>% mutate(
+ df_clean = df_final %>% mutate(
     month = factor(month),
     pickup_hour = factor(pickup_hour),
     pickup_weekday_name = factor(pickup_weekday_name, ordered = FALSE))
 
 # Creating DF subset
-df_model1 = df_clean %>% select(-tpep_pickup_datetime, -tpep_dropoff_datetime, -passenger_count, -PULocationID, -DOLocationID, -payment_type, -source_file, -pickup_time, -dropoff_time, -pickup_date, -dropoff_date, -pickup_weekday_num, -dropoff_hour, -dropoff_weekday_num, -dropoff_weekday_name, -total_amount, -tip_pct, -trip_speed_mph)
+df_model1 = df_clean %>% 
+  select(tip_amount,
+         fare_amount,
+         trip_distance,
+         month,
+         extra,
+         trip_minutes,
+         )
 
 
 # MODEL 1
