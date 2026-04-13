@@ -65,6 +65,18 @@ data where tip amount = 0. So, our lm only fits to tip amount >0 (ask dr.Sadler
 about this in live session tomorrow)
 
 
+- model 1 fit on fare amount (quadratic), extra, trip minutes:
+rmse = 1.239539 mae = 0.927087
+
+- model 1 fit on total amount (quadratic), extra, trip minutes:
+rmse = 1.04982 mae = 0.7762703
+
+- model 1 fit on total amount (quad), extra:
+rmse = 1.052057 mae = 0.7776095
+
+- model 2 fit on total amount (quadratic), extra, trip minutes:
+rmse = 1.006886 mae = 0.7610585
+
 
 
 

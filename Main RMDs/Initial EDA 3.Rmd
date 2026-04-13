@@ -343,7 +343,6 @@ ggplot(df_final, aes(x = fare_amount, y = tip_amount)) +
   coord_cartesian(xlim = c(0, 75), ylim = c(0, 20)) +
   scale_x_continuous(labels = dollar_format()) +
   scale_y_continuous(labels = dollar_format()) +
-<<<<<<< Updated upstream
   labs(
     title = "Tip Amount vs Fare Amount",
     subtitle = "Tips increase with fare, but variability remains high",
@@ -367,15 +366,7 @@ ggplot(df_final, aes(x = fare_amount, y = tip_amount,
   coord_cartesian(xlim = c(0, 75),
                   ylim = c(0, 20)) +
   scale_color_manual(values = c("FALSE" = "black", "TRUE" = "red")) +
-  labs(
-    title = "Tip Amount vs Fare Amount",
-    x = "Fare Amount",
-    y = "Tip Amount"
-  ) +
-  theme_taxi() +
-  theme(legend.position = "none")
 
-=======
   labs(
     title = "Tip Amount vs Fare Amount",
     subtitle = "Tips increase with fare, but variability remains high",
@@ -384,7 +375,6 @@ ggplot(df_final, aes(x = fare_amount, y = tip_amount,
     caption = "Filtered to typical fare and tip ranges"
   ) +
   theme_taxi()
->>>>>>> Stashed changes
 
 # Tip amount vs trip distance
 ggplot(df_final, aes(x = trip_distance, y = tip_amount)) +
@@ -505,6 +495,7 @@ numeric_vars <- df_final %>%
     trip_speed_mph,
     tip_amount,
     pickup_weekday_num,
+    total_amount
     # tourist_season
   )
 

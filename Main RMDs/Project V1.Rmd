@@ -20,6 +20,9 @@ library(DataExplorer)
 library(skimr)
 library(ggplot2)
 library(dplyr)
+library(ggrepel)
+library(ggpmisc)
+library(scales)
 ```
 
 # Read in Data, Select, Filter, Sample, and Mutate/Feature Engineering
@@ -38,9 +41,10 @@ zone_lookup <- read.csv(here("Additional Data", "NYC_Taxi_Zones.csv"))
 ```
 
 #### Selection
-11 of 20 columns were selected; Columns not selected: VendorID, RatecodeID, store_and_fwd_flag, mta_tax, tolls_amount, improvement surcharge, congestion_surcharge, airport_fee, cbd_congestion_fee, passenger_count
+11 of 20 columns were selected; Columns not selected: VendorID, RatecodeID, store_and_fwd_flag, mta_tax, tolls_amount, improvement surcharge, congestion_surcharge, cbd_congestion_fee
 
 #### Filters
+Pickup location and dropoff location are within the selected borough(s), payment type is credit card, passenger count is 1, fare amount is greater than 0, airport fee is 0 (filtering out airport trips)
 
 #### Sample 
 Data is sampled down to a target n, with an even number of samples from each month
@@ -89,8 +93,7 @@ df_sampled <- map_dfr(files, function(f) {
       fare_amount >0,
       # pickup and dropoff cannot be the same datetime
       tpep_pickup_datetime != tpep_dropoff_datetime,
-      # passenger count is not NA
-      # !is.na(passenger_count)
+      # passenger count is only 1
       passenger_count == 1,
       Airport_fee == 0 # cutting out airport trips
     ) %>%
@@ -153,14 +156,7 @@ str(df_final)
 # see counts of each level in passenger_count
 table(df_final$passenger_count)
 hist(df_final$trip_speed_mph)
-hist(df_final$fare_amount)
-hist(df_final$tip_amount)
-hist(df_final$trip_minutes)
-hist(df_final$trip_distance)
 plot(df_final$PULocationID, df_final$tip_amount)
-plot(df_final$tourist_season, df_final$tip_amount)
-plot(df_final$trip_speed_mph, df_final$tip_amount)
-# plot(df_final$passenger_count, df_final$tip_amount)
 
 # look at tip percent in df final
 df_final %>%
@@ -262,57 +258,80 @@ ggplot(df_final, aes(x = fare_amount, y = tip_pct)) +
 # EDA for Tipping Amount
 ```{r}
 # Distribution of tip amount
+median_tip <- median(df_final$tip_amount)
+
 ggplot(df_final, aes(x = tip_amount)) +
-  geom_histogram(bins = 100,
+  geom_histogram(
+    bins = 100,
     fill = "black",
-    color = "#FFF200",) +
-    coord_cartesian(xlim = c(0,20)) +
+    color = "#FFF200",
+    alpha = 0.85,
+    linewidth = 0.2
+  ) +
+  geom_vline(
+    xintercept = median_tip,
+    color = "red",
+    linetype = "dashed",
+    linewidth = 1
+  ) +
+  annotate(
+    "text",
+    x = median_tip,
+    y = Inf,
+    label = paste0("Median: $", round(median_tip, 2)),
+    vjust = 2,
+    hjust = -0.1,
+    color = "red",
+    size = 4,
+    fontface = "bold"
+  ) +
+  coord_cartesian(xlim = c(0, 20)) +
+  scale_x_continuous(labels = dollar_format()) +
   labs(
     title = "Distribution of Tip Amount",
-    x = "Tip Amount",
-    y = "Count"
-  ) + 
+    subtitle = "Right-skewed distribution with concentration at low tip values",
+    x = "Tip Amount ($)",
+    y = "Count",
+    caption = "Median tip highlighted with dashed red line"
+  ) +
   theme_taxi()
 
 # Tip amount vs fare amount
-ggplot(df_final, aes(x = fare_amount, y = tip_amount)) +
-  geom_point(alpha = 0.1) +
-  geom_smooth(method = "lm",
-              linewidth = 0.9,
-              color = "black",
-              linetype = "dashed",
-              se = FALSE) +
-  coord_cartesian(xlim = c(0,75),
-                  ylim = c(0,20)) +
-  labs(
-    title = "Tip Amount vs Fare Amount",
-    x = "Fare Amount",
-    y = "Tip Amount"
-  )+
-  theme_taxi()
 
-# Points where Tip_amt is 0 is in Red
+# These are the outliers in fare amount or tip amount that
+# should be highlighted on the plot
+df_top <- df_final %>%
+  filter(fare_amount > 65 | tip_amount > 20)
+
 ggplot(df_final, aes(x = fare_amount, y = tip_amount,
                      color = tip_amount == 0)) +
-  geom_point(alpha = 0.3) +
-  geom_smooth(method = "lm",
-              linewidth = 0.9,
-              color = "black",
-              linetype = "dashed",
-              se = FALSE,
-              inherit.aes = FALSE,
-              aes(x = fare_amount, y = tip_amount)) +
-  coord_cartesian(xlim = c(0, 75),
-                  ylim = c(0, 20)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(
+    method = "lm",
+    linewidth = 0.9,
+    color = "red",
+    linetype = "dashed",
+    se = FALSE
+  ) +
+  geom_text_repel(
+    data = df_top,
+    aes(label = round(tip_amount, 1)),
+    size = 3,
+    max.overlaps = 10
+  ) +
+  coord_cartesian(xlim = c(0, 75), ylim = c(0, 20)) +
+  scale_x_continuous(labels = dollar_format()) +
+  scale_y_continuous(labels = dollar_format()) +
   scale_color_manual(values = c("FALSE" = "black", "TRUE" = "red")) +
   labs(
     title = "Tip Amount vs Fare Amount",
-    x = "Fare Amount",
-    y = "Tip Amount"
+    subtitle = "Tips increase with fare, but variability remains high",
+    x = "Fare Amount ($)",
+    y = "Tip Amount ($)",
+    caption = "Filtered to typical fare and tip ranges"
   ) +
   theme_taxi() +
   theme(legend.position = "none")
-
 
 # Tip amount vs trip distance
 ggplot(df_final, aes(x = trip_distance, y = tip_amount)) +
@@ -428,6 +447,7 @@ numeric_vars <- df_final %>%
     trip_speed_mph,
     tip_amount,
     pickup_weekday_num,
+    total_amount
     # tourist_season
   )
 
@@ -455,6 +475,7 @@ df_clean <- df_final %>%
     tip_amount > 0,
     tip_amount < quantile(tip_amount, 0.99),
     fare_amount > 0,
+    total_amount > 0,
     trip_distance > 0,
     trip_minutes > 0
   )
@@ -468,6 +489,7 @@ df_clean <- df_final %>%
 df_model1 = df_clean %>% 
   select(tip_amount,
          fare_amount,
+         total_amount,
          trip_distance,
          extra,
          trip_minutes,
@@ -481,13 +503,21 @@ df_model1 = df_clean %>%
 # log1p does log(1+x) so it helps when vairable is 0
 # but now doing just log
 
-fit1 <- lm(log(tip_amount)~fare_amount + I(fare_amount^2) +
-    trip_distance + extra + trip_minutes, data = df_model1)
-summary(fit1)
+# fit1 <- lm(log(tip_amount)~fare_amount + 
+#                           I(fare_amount^2) +
+#                           trip_distance + 
+#                           extra + 
+#                           trip_minutes, 
+#                           data = df_model1)
+# summary(fit1)
 
 # trip_distance & trip_minutes are not seen as significant predictors so we will remove
 
-fit1 <- lm(log(tip_amount)~fare_amount + I(fare_amount^2)  + extra, data = df_model1)
+fit1 <- lm(log(tip_amount)~fare_amount + 
+                          I(fare_amount^2)  + 
+                          extra +
+                          trip_minutes,
+                          data = df_model1)
 summary(fit1)
 
 # Assumptions
@@ -512,6 +542,35 @@ rmse
 # MAE on original scale
 mae <- mean(abs(df_model1$tip_amount - pred_tip))
 mae
+```
+
+```{r}
+fit1b <- lm(log(tip_amount)~total_amount + 
+                          I(total_amount^2)  + 
+                          extra +
+                          trip_minutes,
+                          data = df_model1)
+summary(fit1b)
+
+# Assumptions
+par(mfrow = c(2, 2))
+plot(fit1b)
+
+par(mfrow = c(1, 1))
+
+# predicted values on log scale
+pred_log <- predict(fit1b)
+
+# back-transform to original dollar scale
+pred_tip <- exp(pred_log)
+
+# RMSE on original scale
+rmse <- sqrt(mean((df_model1$tip_amount - pred_tip)^2))
+rmse
+
+# MAE on original scale
+mae <- mean(abs(df_model1$tip_amount - pred_tip))
+mae
 
 ```
 
@@ -523,16 +582,20 @@ df_typical <- df_final %>%
   filter(
     tip_amount > 0,
     fare_amount > 0,
+    total_amount > 0,
     trip_distance > 0,
     trip_minutes > 0,
     between(fare_amount, quantile(fare_amount, 0.01), quantile(fare_amount, 0.99)),
+    between(total_amount, quantile(total_amount, 0.01), quantile(total_amount, 0.99)),
     between(trip_distance, quantile(trip_distance, 0.01), quantile(trip_distance, 0.99)),
     between(trip_minutes, quantile(trip_minutes, 0.01), quantile(trip_minutes, 0.99)),
     between(tip_pct, quantile(tip_pct, 0.01), quantile(tip_pct, 0.99))
   )
 
 fit2 <- lm(
-  log(tip_amount) ~ fare_amount + I(fare_amount^2) + extra,
+  log(tip_amount) ~ total_amount + 
+    I(total_amount^2) + 
+    extra,
   data = df_typical
 )
 summary(fit2)
