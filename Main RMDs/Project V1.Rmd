@@ -84,17 +84,13 @@ df_sampled <- map_dfr(files, function(f) {
   
   df %>%
     filter(
-      # Both pickup and dropoff are in selected borough
-      PULocationID %in% zone_ids,
+      PULocationID %in% zone_ids, # Both pickup and dropoff are in selected borough
       DOLocationID %in% zone_ids,
-      # payment type is 1 (credit card)
-      payment_type == 1,
-      # fare amount must be greater than 0
-      fare_amount >0,
-      # pickup and dropoff cannot be the same datetime
-      tpep_pickup_datetime != tpep_dropoff_datetime,
-      # passenger count is only 1
-      passenger_count == 1,
+      payment_type == 1, # payment type is 1 (credit card)
+      fare_amount >0, # fare amount must be greater than 0
+      total_amount >0,
+      tpep_pickup_datetime != tpep_dropoff_datetime, # pickup and dropoff cannot be the same datetime
+      passenger_count == 1, # passenger count is only 1 
       Airport_fee == 0 # cutting out airport trips
     ) %>%
     ## 25,386,827 = over 25M observations after filtering
@@ -468,14 +464,13 @@ plot_correlation(numeric_vars)
 # Listing Columns
 names(df_final)
 
-# Clean obvious bad records before modeling
-# these are already filtered in df_final (see histograms in skim section)
+# Clean obvious bad records before modelingd 
 df_clean <- df_final %>%
   filter(
-    tip_amount > 0,
+    tip_amount > 0, 
     tip_amount < quantile(tip_amount, 0.99),
-    fare_amount > 0,
-    total_amount > 0,
+    # fare_amount > 0, # already filtered in original data clenaing
+    # total_amount > 0, # already filtered in original data clenaing
     trip_distance > 0,
     trip_minutes > 0
   )
@@ -503,13 +498,13 @@ df_model1 = df_clean %>%
 # log1p does log(1+x) so it helps when vairable is 0
 # but now doing just log
 
-# fit1 <- lm(log(tip_amount)~fare_amount + 
-#                           I(fare_amount^2) +
-#                           trip_distance + 
-#                           extra + 
-#                           trip_minutes, 
-#                           data = df_model1)
-# summary(fit1)
+fit1 <- lm(log(tip_amount)~fare_amount +
+                          I(fare_amount^2) +
+                          trip_distance +
+                          extra +
+                          trip_minutes,
+                          data = df_model1)
+summary(fit1)
 
 # trip_distance & trip_minutes are not seen as significant predictors so we will remove
 
@@ -526,7 +521,7 @@ plot(fit1)
 par(mfrow = c(1, 1))
 
 # Outliers
-df_o = df_final[c(5313),] 
+df_o1 = df_clean[c(5313),] 
 # investigated outlier, but tip amt / % seems to be reaonsable based on fare_amount. Nothing esle seemed out of the ordinary. 
 
 # predicted values on log scale
@@ -544,6 +539,7 @@ mae <- mean(abs(df_model1$tip_amount - pred_tip))
 mae
 ```
 
+### MODEL 1b
 ```{r}
 fit1b <- lm(log(tip_amount)~total_amount + 
                           I(total_amount^2)  + 
@@ -555,8 +551,29 @@ summary(fit1b)
 # Assumptions
 par(mfrow = c(2, 2))
 plot(fit1b)
-
 par(mfrow = c(1, 1))
+
+# Looking into Outliars
+df_o1b = df_clean[c(8455, 7741),]
+# obs 8455 will be removed due to error. Trip distance was only .69 but trip minutes was 1433.72 
+# keep 7741 because nothing out of the ordinary
+
+# data after removing obs 8455
+df_model1b = df_model1[-c(8455),]
+# REFIT
+fit1b <- lm(log(tip_amount)~total_amount + 
+                          I(total_amount^2) + 
+                          extra +
+                          trip_minutes,
+                          data = df_model1b)
+summary(fit1b)
+
+
+# Re-check Assumptions
+par(mfrow = c(2, 2))
+plot(fit1b)
+par(mfrow = c(1, 1))
+
 
 # predicted values on log scale
 pred_log <- predict(fit1b)
@@ -565,13 +582,12 @@ pred_log <- predict(fit1b)
 pred_tip <- exp(pred_log)
 
 # RMSE on original scale
-rmse <- sqrt(mean((df_model1$tip_amount - pred_tip)^2))
+rmse <- sqrt(mean((df_model1b$tip_amount - pred_tip)^2))
 rmse
 
 # MAE on original scale
-mae <- mean(abs(df_model1$tip_amount - pred_tip))
+mae <- mean(abs(df_model1b$tip_amount - pred_tip))
 mae
-
 ```
 
 
@@ -581,10 +597,10 @@ df_typical <- df_final %>%
   mutate(tip_pct = tip_amount / fare_amount) %>%
   filter(
     tip_amount > 0,
-    fare_amount > 0,
-    total_amount > 0,
-    trip_distance > 0,
-    trip_minutes > 0,
+    # fare_amount > 0, # already filtered in original data cleaning
+    # total_amount > 0, # already filtered in original data cleaning
+    # trip_distance > 0, # already filtered in modeling data cleaning
+    # trip_minutes > 0, # already filtered in modeling data cleaning
     between(fare_amount, quantile(fare_amount, 0.01), quantile(fare_amount, 0.99)),
     between(total_amount, quantile(total_amount, 0.01), quantile(total_amount, 0.99)),
     between(trip_distance, quantile(trip_distance, 0.01), quantile(trip_distance, 0.99)),
@@ -624,14 +640,14 @@ mae
 
 
 # FOR RAG:
-DATA CLEANING
+*DATA CLEANING
 - For our dataset, we are looking at a random sample of 10,008 observations from the NYC Yellow Taxi Trip data for 2025. We randomly sampled 834 observations from each of the months
 - We are only looking at data from the following Borough(s): [Manhattan, Queens]. We have the ability to look at other boroughs in the future
 - Given credit card was the overwhelming choice for payment_type, we filtered our data set to only look at credit card payments
 - Passenger Count is driver-reported so when driver doesnt report count, it will
 be a NA. It is commonly understood that when passenger_count is over 1, passengers are less likley to take responsibility to tip. Given these factors, we filtered our dataset to just look at observations where the passenger count was equal to 1. 
 - Because airport trips often involve unique fare structures, longer travel distances, and different rider tipping behavior than typical city taxi rides, it is reasonable to exclude them and focus the analysis on non-airport trips so the model reflects a more consistent and representative set of everyday taxi rides.
-PLOTS
+*PLOTS
 - Wanted to take detail look at tip percentage (tip %)
 - The distribution of tip percentage is heavily right-skewed, with most rides having tip percentages in a moderate range and a small number of rides exhibiting unusually large tip percentages. This long right tail suggests the presence of outliers and indicates that tip percentage is not normally distributed.
 - Distribution of tip percentage (tip %) appears relatively consistent throughoout each day of the week
@@ -639,5 +655,16 @@ PLOTS
 - Distribution of tip amount appears to be right-skewed. This indicates that small to moderate tips are common, while relatively large tips occur much less frequently.
 - Tip amount generally increases as fare amount increases, showing a positive association between the two variables. However, the spread in tip amount also increases for larger fares, and there are several zero-tip rides and some unusually large tips present. Due to the several zero-tip rides across nearly all values for fare amount, we decided to only analyze rides where tip amount was greater than 0. 
 - The scatterplot suggests a positive, roughly linear association between trip distance and tip amount, with longer trips generally corresponding to larger tips. Most observations are concentrated among shorter trips with smaller tips, while the spread in tip amount increases as trip distance increases. The plot also shows many rides with zero or very small tips across distances, along with a few unusually large tips that may be considered outliers. A similar case is present with tip amount vs trip duration. 
-- 
+- The distribution of tip amount seems to be pretty even throughout the week
+- Our correlation heatmap provides some valuable insights into which numerical variables we might want to consider adding into our model. Fare_amount, trip_distance, and total_amount all have a correlation of above .5 with tip_amount.
+*MODELING
+** additional cleaning before modeling
+- Right before we began modeling, we decided to filter our dataset a little more. We wanted to only focus on rides where the tip_amount was greater than 0. When looking at the EDA plot for Tip Amount vs Fare Amount, one can see that there are several observations where tip amount was 0 yet fare amount varied with values much higher than 0. Therefore, it appears that tip amounts can be zero rather arbitrarily due to human decision. 
+- We also wanted to only look at rides where trip distance and trip minutes were greater than 0 due to the likelihood of rides happening often
+** modeling
+- We initially ran a multiple linear regression model with multiple predictors but after looking at the residual plots, we thought it would be best to perform a log-linear transformation as well as add a quadratic effect to one of the predictors to improve the assumptions for linear regression. 
+- We experimented with predictors such as fare_amount, total_amount, extra, trip_minutes, and trip_distance. After fitting multiple models and comparing how each of them satisfied the assumptions for linear regression, as well as their RMSE (Root Mean Squared Error) & MAE (Mean Absolute Error), and then even furthering our filtering process of the data to remove any outliars that were justified of removal (observation 8455), we finally landed on a model. 
+- Our model was log(tip_amount)=β0+β1(total_amount)+β2(total_amount^2)+β3(extra)+β4(trip_minutes)
+- The final log-linear model with a quadratic term for total amount provided the best overall fit among the models considered. Diagnostic plots suggested that linearity and constant variance were reasonably improved, although not perfectly satisfied. The Q-Q plot still showed noticeable tail departures from normality, indicating that the residuals were not fully normal. In addition, a small number of potentially influential observations remained. Despite these limitations, this model was retained because it was the most reasonable linear regression model we obtained and achieved the desired predictive performance.
+- Predicted values from the log-linear model were back-transformed to the original tip scale so that prediction error could be evaluated in dollars. Using these back-transformed predictions, the model achieved an RMSE of 1.089 and an MAE of 0.770, indicating that the model satisfied the project’s required prediction benchmarks (RMSE <= 2, MAE <= 1.5)
 
