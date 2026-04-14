@@ -1,6 +1,5 @@
 ttp://www.nyc.gov/html/tlc/html/about/trip_record_data.shtml.
 
-* HAVE NOT FINISHED
 
 tip_amount: Tip amount – This field is automatically populated for credit card tips. Cash
 tips are not included.
@@ -34,21 +33,23 @@ extra: Miscellaneous extras and surcharges.
 
 passenger_count: The number of passengers in the vehicle.
 
-Airport_fee:
+Airport_fee: For pick up only at LaGuardia and John F. Kennedy Airports
 
-source_file:
+source_file: shows which original parquet file the data comes from
 
-month:
+month: shows which month of 2025 that the data is from
 
-tourist_season:
+tourist_season: checks whether ride took place during common tourist month or not
+  1 = if month is July, October, November, December
+  0 = all other months
 
-pickup_weekday_name:
+pickup_weekday_name: the day of the week that the ride began
 
-dropoff_weekday_name:
+dropoff_weekday_name: the day of the week that the ride ended
 
-trip_minutes:
+trip_minutes: the duration of the ride in minutes
 
-trip_speed_mph:
+trip_speed_mph: the average speed of the ride
 
-tip_pct:
+tip_pct: The tip amount expressed as a percent of the fare amount.
 

@@ -24,6 +24,7 @@ library(ggrepel)
 library(ggpmisc)
 library(scales)
 library(readr)
+library(arrow)
 ```
 
 # Read in Data, Select, Filter, Sample, and Mutate/Feature Engineering
@@ -39,13 +40,20 @@ files <- list.files(here("Main data"), pattern = "\\.parquet$", full.names = TRU
 
 # Read in taxi zone lookup
 zone_lookup <- read.csv(here("Additional Data", "NYC_Taxi_Zones.csv"))
+
+
 ```
 
-#### Selection
-11 of 20 columns were selected; Columns not selected: VendorID, RatecodeID, store_and_fwd_flag, mta_tax, tolls_amount, improvement surcharge, congestion_surcharge, cbd_congestion_fee
+### Looking into Total Amount
+```{r}
+# parquet1 = read_parquet('/Users/joshtsamuel/SMU/DS-6306 Doing Data Science/DDS-Project2/Main Data/yellow_tripdata_2025-01.parquet')
+# parquet1_test = parquet1[c(1,2),]
+# parquet1_test = parquet1_test %>% mutate(TotalAmount2 = fare_amount + extra + mta_tax + tolls_amount + improvement_surcharge + Airport_fee + cbd_congestion_fee + tip_amount)
 
-#### Filters
-Pickup location and dropoff location are within the selected borough(s), payment type is credit card, passenger count is 1, fare amount is greater than 0, airport fee is 0 (filtering out airport trips)
+# Findings: total amount is equal to fare_amount + extra taxes / amounts + tip_amount. It does NOT include however "congestion_surchage"
+
+```
+
 
 #### Sample 
 Data is sampled down to a target n, with an even number of samples from each month
@@ -145,7 +153,7 @@ df_final <- df_sampled %>%
     # tip_pct = if_else(fare_amount > 0, tip_amount / fare_amount, NA_real_),
     # Capping Extreme Tip % Values between 0 and 100 whenever fare amount is too low
     # tip_pct = if_else(tip_pct < 0 | tip_pct > 1, NA_real_, tip_pct)
-    tip_pct = 100 * tip_amount / fare_amount
+    tip_pct = 100 * tip_amount / fare_amount # SHOULD WE SWITCH to Total_Amount
   )
 
 df_rshiny = df_final %>% select(-pickup_time, -dropoff_time, -pickup_hour, -dropoff_hour, -pickup_date, -dropoff_date, -pickup_weekday_num, -dropoff_weekday_num)
@@ -525,8 +533,7 @@ summary(fit1)
 
 fit1 <- lm(log(tip_amount)~fare_amount + 
                           I(fare_amount^2)  + 
-                          extra +
-                          trip_minutes,
+                          extra,
                           data = df_model1)
 summary(fit1)
 
@@ -535,9 +542,70 @@ par(mfrow = c(2, 2))
 plot(fit1)
 par(mfrow = c(1, 1))
 
+
+
+# Interaction Needed?
+
+# model without interaction
+fit_main <- lm(log(tip_amount)~fare_amount + 
+                          I(fare_amount^2)  + 
+                          extra,
+                          data = df_model1)
+
+# model with interaction
+fit_int <- lm(log(tip_amount)~fare_amount + 
+                          I(fare_amount^2)  + 
+                          extra + fare_amount*extra,
+                          data = df_model1)
+anova(fit_main, fit_int)
+
+
+
+
+
 # Outliers
-df_o1 = df_clean[c(5313),] 
-# investigated outlier, but tip amt / % seems to be reaonsable based on fare_amount. Nothing esle seemed out of the ordinary. 
+
+# studentized residuals, leverage, Cook's distance
+rstud <- rstudent(fit1)
+lev   <- hatvalues(fit1)
+cd    <- cooks.distance(fit1)
+
+n <- nrow(model.frame(fit1))
+p <- length(coef(fit1))
+
+# stricter flags
+which(abs(rstud) > 3)       # strong residual outliers
+which(lev > 3 * p / n)      # higher leverage cutoff
+which(cd > 1)               # very influential points
+
+# top 10 by Cook's distance
+head(order(cd, decreasing = TRUE), 10)
+
+# top 10 by absolute studentized residual
+head(order(abs(rstud), decreasing = TRUE), 10)
+
+# top 10 by leverage
+head(order(lev, decreasing = TRUE), 10)
+
+
+idx <- unique(c(
+  head(order(cd, decreasing = TRUE), 10),
+  head(order(abs(rstud), decreasing = TRUE), 10),
+  head(order(lev, decreasing = TRUE), 10)
+))
+
+df_o = df_clean[idx, ] # other outliers due to tip pct% being SO small even with larger fare amounts. We will keep in model
+df_o1 = df_clean[c(1902, 4805,2217),]
+# Nothing out of the ordinary is being displayed outliers so we will keep them in the model
+
+
+
+# Assumptions
+par(mfrow = c(2, 2))
+plot(fit1)
+par(mfrow = c(1, 1))
+
+
 
 # predicted values on log scale
 pred_log <- predict(fit1)
@@ -554,56 +622,6 @@ mae <- mean(abs(df_model1$tip_amount - pred_tip))
 mae
 ```
 
-### MODEL 1b
-```{r}
-fit1b <- lm(log(tip_amount)~total_amount + 
-                          I(total_amount^2)  + 
-                          extra +
-                          trip_minutes,
-                          data = df_model1)
-summary(fit1b)
-
-# Assumptions
-par(mfrow = c(2, 2))
-plot(fit1b)
-par(mfrow = c(1, 1))
-
-# Looking into Outliars
-df_o1b = df_clean[c(8455, 7741),]
-# obs 8455 will be removed due to error. Trip distance was only .69 but trip minutes was 1433.72 
-# keep 7741 because nothing out of the ordinary
-
-# data after removing obs 8455
-df_model1b = df_model1[-c(8455),]
-# REFIT
-fit1b <- lm(log(tip_amount)~total_amount + 
-                          I(total_amount^2) + 
-                          extra +
-                          trip_minutes,
-                          data = df_model1b)
-summary(fit1b)
-
-
-# Re-check Assumptions
-par(mfrow = c(2, 2))
-plot(fit1b)
-par(mfrow = c(1, 1))
-
-
-# predicted values on log scale
-pred_log <- predict(fit1b)
-
-# back-transform to original dollar scale
-pred_tip <- exp(pred_log)
-
-# RMSE on original scale
-rmse <- sqrt(mean((df_model1b$tip_amount - pred_tip)^2))
-rmse
-
-# MAE on original scale
-mae <- mean(abs(df_model1b$tip_amount - pred_tip))
-mae
-```
 
 
 ### MODEL 2 - Cleaning for Typical Cases
@@ -662,6 +680,7 @@ mae
 - Passenger Count is driver-reported so when driver doesnt report count, it will
 be a NA. It is commonly understood that when passenger_count is over 1, passengers are less likley to take responsibility to tip. Given these factors, we filtered our dataset to just look at observations where the passenger count was equal to 1. 
 - Because airport trips often involve unique fare structures, longer travel distances, and different rider tipping behavior than typical city taxi rides, it is reasonable to exclude them and focus the analysis on non-airport trips so the model reflects a more consistent and representative set of everyday taxi rides.
+- We also wanted to look into what total_amount was composed of. We found that total amount is equal to fare_amount + all of the extra taxes / amounts + tip_amount. It does NOT include however "congestion_surchage". Thus, we will not use total_amount to predict for tip_amount due to issues such as data leakage. 
 *PLOTS
 - Wanted to take detail look at tip percentage (tip %)
 - The distribution of tip percentage is heavily right-skewed, with most rides having tip percentages in a moderate range and a small number of rides exhibiting unusually large tip percentages. This long right tail suggests the presence of outliers and indicates that tip percentage is not normally distributed.
@@ -677,9 +696,12 @@ be a NA. It is commonly understood that when passenger_count is over 1, passenge
 - Right before we began modeling, we decided to filter our dataset a little more. We wanted to only focus on rides where the tip_amount was greater than 0. When looking at the EDA plot for Tip Amount vs Fare Amount, one can see that there are several observations where tip amount was 0 yet fare amount varied with values much higher than 0. Therefore, it appears that tip amounts can be zero rather arbitrarily due to human decision. 
 - We also wanted to only look at rides where trip distance and trip minutes were greater than 0 due to the likelihood of rides happening often
 ** modeling
-- We initially ran a multiple linear regression model with multiple predictors but after looking at the residual plots, we thought it would be best to perform a log-linear transformation as well as add a quadratic effect to one of the predictors to improve the assumptions for linear regression. 
-- We experimented with predictors such as fare_amount, total_amount, extra, trip_minutes, and trip_distance. After fitting multiple models and comparing how each of them satisfied the assumptions for linear regression, as well as their RMSE (Root Mean Squared Error) & MAE (Mean Absolute Error), and then even furthering our filtering process of the data to remove any outliars that were justified of removal (observation 8455), we finally landed on a model. 
-- Our model was log(tip_amount)=β0+β1(total_amount)+β2(total_amount^2)+β3(extra)+β4(trip_minutes)
-- The final log-linear model with a quadratic term for total amount provided the best overall fit among the models considered. Diagnostic plots suggested that linearity and constant variance were reasonably improved, although not perfectly satisfied. The Q-Q plot still showed noticeable tail departures from normality, indicating that the residuals were not fully normal. In addition, a small number of potentially influential observations remained. Despite these limitations, this model was retained because it was the most reasonable linear regression model we obtained and achieved the desired predictive performance.
-- Predicted values from the log-linear model were back-transformed to the original tip scale so that prediction error could be evaluated in dollars. Using these back-transformed predictions, the model achieved an RMSE of 1.089 and an MAE of 0.770, indicating that the model satisfied the project’s required prediction benchmarks (RMSE <= 2, MAE <= 1.5)
-
+- We initially ran a multiple linear regression model with multiple predictors but after looking at the residual plots, we thought it would be best to perform a log-linear transformation as well as add a quadratic effect to one of the predictors to improve the assumptions for linear regression.
+- We experimented with predictors such as fare_amount, extra, trip_minutes, and trip_distance. After fitting multiple models and comparing how each of them satisfied the assumptions for linear regression, as well as their RMSE (Root Mean Squared Error) & MAE (Mean Absolute Error), and then even furthering our filtering process of the data to remove any outliers that were justified of removal, we finally landed on a model. 
+- Our model was log(tip_amount)=β0+β1(fare_amount)+β2(fare_amount^2)+β3(extra)
+- We also explored adding an interaction between fare_amount and extra. While the p-value was significant when running the anova to compare our models, we only saw a very minimal drop in the Sum of Square Residuals, so we decided to leave the interaction out of our model. 
+- The final log-linear model with a quadratic term for fare amount provided the best overall fit among the models considered. Diagnostic plots suggested that linearity and constant variance were reasonably improved, although not perfectly satisfied. The Q-Q plot still showed noticeable tail departures from normality, indicating that the residuals were not fully normal. In addition, a small number of potentially influential observations remained. Despite these limitations, this model was retained because it was the most reasonable linear regression model we obtained and achieved the desired predictive performance.
+- Predicted values from the log-linear model were back-transformed to the original tip scale so that prediction error could be evaluated in dollars. Using these back-transformed predictions, the model achieved an RMSE of 1.244 and an MAE of 0.926, indicating that the model satisfied the project’s required prediction benchmarks (RMSE <= 2, MAE <= 1.5)
+*ADDITIONAL THOUGHTS
+- We also ran the same analysis for 100,000 observations (evenly distributed among the 12 months) to see if our findings would be similar and that proved to be the case. 
+- *Include any additional justification as to why we are only predicting for when tip amounts are greater than 0. 
