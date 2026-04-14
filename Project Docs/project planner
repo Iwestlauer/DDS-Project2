@@ -23,7 +23,19 @@ TODO Monday 4/13 through Thursday 4/16
 --compose documents to feed to RAG -at least answer top 10 FAQ (Josh, aim for Sun 4/12)
 --put together the most simple minimal RAG possible (Isabella, before live session Mon 4/13)
 --Monday after live session night meeting to test RAG
---Tuesday meeting to put together a basic Rshiny with some project findings + interactive plots
+
+
+--Tuesday meeting to put together a basic Rshiny with some project findings 
++ interactive plots -- comparison of tip amount distribution color coded by borough
+  tip amount vs fare amount color coded by borough
+  tip amount by month, again color coded by borough
+
+EXTRA CREDIT:
+--compare tip amount distribution for different boroughs- can we find any pattern that could help
+with a piecewise prediction model?
+--try using weather data or something else to help predict tip amt = 0?
+--figure out if total amount is related to fare amount + taxes + surcharges
+  
 --Wednesday meeting incorporate RAG into Rshiny - add RAG to PPT (finish PPT)
 --Thursday finish everything (polish deliverables and record presentation) before 8:30pm
 
