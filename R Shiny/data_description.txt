@@ -1,0 +1,54 @@
+ttp://www.nyc.gov/html/tlc/html/about/trip_record_data.shtml.
+
+* HAVE NOT FINISHED
+
+tip_amount: Tip amount – This field is automatically populated for credit card tips. Cash
+tips are not included.
+  
+tpep_pickup_datetime: The date and time when the meter was engaged.
+
+tpep_dropoff_datetime: The date and time when the meter was disengaged.
+
+fare_amount: The time-and-distance fare calculated by the meter. For additional
+information on the following columns, see
+https://www.nyc.gov/site/tlc/passengers/taxi-fare.page
+
+trip_distance: The elapsed trip distance in miles reported by the taximeter.
+
+total_amount: The total amount charged to passengers. Does not include cash tips.
+  
+PULocationID: TLC Taxi Zone in which the taximeter was engaged.
+
+DOLocationID: TLC Taxi Zone in which the taximeter was disengaged.
+
+payment_type: A numeric code signifying how the passenger paid for the trip.
+  0 = Flex Fare trip
+  1 = Credit card * ONLY used Credit Card for this Analysis
+  2 = Cash
+  3 = No charge
+  4 = Dispute
+  5 = Unknown
+  6 = Voided trip
+  
+extra: Miscellaneous extras and surcharges.
+
+passenger_count: The number of passengers in the vehicle.
+
+Airport_fee:
+
+source_file:
+
+month:
+
+tourist_season:
+
+pickup_weekday_name:
+
+dropoff_weekday_name:
+
+trip_minutes:
+
+trip_speed_mph:
+
+tip_pct:
+

@@ -23,6 +23,7 @@ library(dplyr)
 library(ggrepel)
 library(ggpmisc)
 library(scales)
+library(readr)
 ```
 
 # Read in Data, Select, Filter, Sample, and Mutate/Feature Engineering
@@ -50,6 +51,7 @@ Pickup location and dropoff location are within the selected borough(s), payment
 Data is sampled down to a target n, with an even number of samples from each month
 
 ```{r}
+set.seed(123)
 # Get the Location IDs that belong to the selected borough
 # Note: this may be a dropdown selection in the RShiny app
 selected_boroughs <- c("Manhattan", "Queens")
@@ -64,23 +66,7 @@ n_per_file <- ceiling(target_n / length(files))
 
 df_sampled <- map_dfr(files, function(f) {
   
-  df <- read_parquet(
-    f,
-    col_select = c(
-      "tpep_pickup_datetime",
-      "tpep_dropoff_datetime",
-      "fare_amount",
-      "trip_distance",
-      "tip_amount",
-      "total_amount",
-      "PULocationID",
-      "DOLocationID",
-      "payment_type",
-      "extra",
-      "passenger_count",
-      "Airport_fee"
-    )
-  )
+  df <- read_parquet(f)
   
   df %>%
     filter(
@@ -104,6 +90,29 @@ df_sampled <- map_dfr(files, function(f) {
 
 # Checking if there is an even sample from each of the months
 df_sampled %>% count(source_file)
+
+# write df_sampled to csv
+# write_csv(df_sampled, here("R Shiny", "df_sampled.csv"))
+
+
+# selecting only specific columns
+df_sampled = df_sampled %>% select(
+      "tip_amount",
+      "tpep_pickup_datetime",
+      "tpep_dropoff_datetime",
+      "fare_amount",
+      "trip_distance",
+      "total_amount",
+      "PULocationID",
+      "DOLocationID",
+      "payment_type",
+      "extra",
+      "passenger_count",
+      "Airport_fee",
+      "source_file",
+      "month"
+)
+
 ```
 
 
@@ -139,6 +148,12 @@ df_final <- df_sampled %>%
     tip_pct = 100 * tip_amount / fare_amount
   )
 
+df_rshiny = df_final %>% select(-pickup_time, -dropoff_time, -pickup_hour, -dropoff_hour, -pickup_date, -dropoff_date, -pickup_weekday_num, -dropoff_weekday_num)
+
+
+
+# writing csv file for R shiny
+write_csv(df_rshiny, here("R Shiny", "df_rshiny.csv"))
 ```
 
 

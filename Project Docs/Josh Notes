@@ -27,3 +27,16 @@ at VIF. NOT correlation. VIF stands for variance inflation factor.
 - At bottom Initial EDA 3, I added a Modeling section and was testing out linear model
 > assumptions still dont look great even after some transformations and cleaning. 
 > Going to look a lot more into this tomorrow. 
+
+
+# Monday April 13
+- We could possibly double our sample
+- look at two other boroughs and compare to what we have now
+- average % of $0 tips the saem from borough to borough
+- exploring around
+- totally fine to well describe that phenomenon
+- we cannot predict $0 tips and here is why. Make sure to describe
+- possibly add weather data to it if we want
+> if we dont want to extrapolate 
+- 
+- 
