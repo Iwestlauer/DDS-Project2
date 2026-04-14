@@ -79,9 +79,9 @@ hf_embed <- function(text, hf_token,
 
 # build local chunk store
 files <- list(
-  # read_rmd_file("project.Rmd"),
+  read_rmd_file("Main RMDs/Project V1.Rmd"),
   # read_pdf_file("paper1.pdf"),
-  # read_pdf_file("paper2.pdf")
+  read_pdf_file("Project Docs/data_dictionary_trip_records_yellow.pdf"),
   read_docx_file("RAG/Final Project RAG Document.docx")
 )
 

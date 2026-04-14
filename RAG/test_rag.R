@@ -24,7 +24,8 @@ library(tibble)
 library(officer)
 
 # ---- settings ----
-docx_path <- "RAG/Final Project RAG Document.docx"   # <-- CHANGE THIS
+# docx_path <- "RAG/Final Project RAG Document.docx"
+# pdf_path <- "Project Docs/data_dictionary_trip_records_yellow.pdf"
 hf_token <- Sys.getenv("HUGGINGFACE_API_KEY")
 
 embedding_model <- "sentence-transformers/all-MiniLM-L6-v2"
@@ -33,6 +34,7 @@ chat_model <- "meta-llama/Llama-3.1-8B-Instruct:cerebras"
 # ---- checks ----
 if (hf_token == "") stop("HUGGINGFACE_API_KEY is not set in your R environment.")
 if (!file.exists(docx_path)) stop("DOCX file not found: ", docx_path)
+if (!file.exists(pdf_path)) stop("PDF file not found: ", pdf_path)
 
 cat("HUGGINGFACE_API_KEY found\n")
 cat("DOCX file found\n")
@@ -50,11 +52,30 @@ read_docx_text <- function(path) {
   str_squish(txt)
 }
 
-doc_text <- read_docx_text(docx_path)
+read_pdf_file <- function(path) {
+  txt <- pdf_text(path)
+  tibble(
+    source = basename(path),
+    text = paste(txt, collapse = "\n")
+  )
+}
+# 
+# doc_text <- read_docx_text(docx_path)
+# pdf_text <- read_pdf_file(pdf_path)
 
-cat("\nDocument length (characters): ", nchar(doc_text), "\n", sep = "")
-cat("\nFirst 500 characters:\n")
-cat(substr(doc_text, 1, 500), "\n\n")
+# cat("\nDocument length (characters): ", nchar(doc_text), "\n", sep = "")
+# cat("\nFirst 500 characters:\n")
+# cat(substr(doc_text, 1, 500), "\n\n")
+
+# build local chunk store
+files <- list(
+  read_rmd_file("Main RMDs/Project V1.Rmd"),
+  # read_pdf_file("paper1.pdf"),
+  read_pdf_file("Project Docs/data_dictionary_trip_records_yellow.pdf"),
+  read_docx_file("RAG/Final Project RAG Document.docx")
+)
+
+docs <- bind_rows(files)
 
 # ---- chunking ----
 chunk_text <- function(text, chunk_size = 700, overlap = 120) {
@@ -66,11 +87,10 @@ chunk_text <- function(text, chunk_size = 700, overlap = 120) {
   map_chr(starts, ~ str_sub(text, .x, .x + chunk_size - 1))
 }
 
-chunks <- tibble(
-  source = basename(docx_path),
-  chunk = chunk_text(doc_text, chunk_size = 700, overlap = 120)
-) %>%
-  mutate(chunk_id = row_number()) %>%
+chunks <- docs |>
+  mutate(chunk = map(text, chunk_text)) |>
+  tidyr::unnest(chunk) |>
+  mutate(chunk_id = row_number()) |>
   select(chunk_id, source, chunk)
 
 cat("Number of chunks: ", nrow(chunks), "\n\n", sep = "")
@@ -208,12 +228,13 @@ cat("Chat test response:\n")
 cat(chat_test_out$choices[[1]]$message$content, "\n\n")
 
 # ---- ask a sample question ----
-sample_question <- "What was the RMSE and MAE of the final model?"
+sample_question <- "Is there code for a plot for the distribution of tip percent?"
 #What steps were taken for data cleaning?
 #Were airport trips included?
 #Describe the distribution of tip amount?
 #How does tip amount and fare amount relate to each other?
 #What was the final model?
+#What is the meaning of airport_fee?
 
 top_chunks <- retrieve_chunks(sample_question, chunks, hf_token, k = 3)
 
