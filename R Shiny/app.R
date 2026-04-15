@@ -47,6 +47,7 @@ ui <- dashboardPage(
       menuItem("Barchart", tabName = "bar"),
       menuItem("Data Viewer", tabName = "data"),
       menuItem("Data Dictionary", tabName = "dictionary")
+      # menuItem("Chatbot", tabName = "chatbot" )
     )
   ),
   

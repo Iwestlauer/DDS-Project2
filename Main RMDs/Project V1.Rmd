@@ -670,38 +670,3 @@ mae <- mean(abs(df_typical$tip_amount - pred_tip))
 mae
 ```
 
-
-
-# FOR RAG:
-*DATA CLEANING
-- For our dataset, we are looking at a random sample of 10,008 observations from the NYC Yellow Taxi Trip data for 2025. We randomly sampled 834 observations from each of the months
-- We are only looking at data from the following Borough(s): [Manhattan, Queens]. We have the ability to look at other boroughs in the future
-- Given credit card was the overwhelming choice for payment_type, we filtered our data set to only look at credit card payments
-- Passenger Count is driver-reported so when driver doesnt report count, it will
-be a NA. It is commonly understood that when passenger_count is over 1, passengers are less likley to take responsibility to tip. Given these factors, we filtered our dataset to just look at observations where the passenger count was equal to 1. 
-- Because airport trips often involve unique fare structures, longer travel distances, and different rider tipping behavior than typical city taxi rides, it is reasonable to exclude them and focus the analysis on non-airport trips so the model reflects a more consistent and representative set of everyday taxi rides.
-- We also wanted to look into what total_amount was composed of. We found that total amount is equal to fare_amount + all of the extra taxes / amounts + tip_amount. It does NOT include however "congestion_surchage". Thus, we will not use total_amount to predict for tip_amount due to issues such as data leakage. 
-*PLOTS
-- Wanted to take detail look at tip percentage (tip %)
-- The distribution of tip percentage is heavily right-skewed, with most rides having tip percentages in a moderate range and a small number of rides exhibiting unusually large tip percentages. This long right tail suggests the presence of outliers and indicates that tip percentage is not normally distributed.
-- Distribution of tip percentage (tip %) appears relatively consistent throughoout each day of the week
-- Appears to be a negative, nonlinear association between fare amount and tip percentage. For smaller fares, tip percentages are much more spread out and can be quite large, while for larger fares, tip percentages tend to be lower and more tightly clustered. This pattern suggests that riders often leave disproportionately high percentage tips on very small fares, whereas tip percentages become more consistent at more moderate levels as fare amount increases.
-- Distribution of tip amount appears to be right-skewed. This indicates that small to moderate tips are common, while relatively large tips occur much less frequently.
-- Tip amount generally increases as fare amount increases, showing a positive association between the two variables. However, the spread in tip amount also increases for larger fares, and there are several zero-tip rides and some unusually large tips present. Due to the several zero-tip rides across nearly all values for fare amount, we decided to only analyze rides where tip amount was greater than 0. 
-- The scatterplot suggests a positive, roughly linear association between trip distance and tip amount, with longer trips generally corresponding to larger tips. Most observations are concentrated among shorter trips with smaller tips, while the spread in tip amount increases as trip distance increases. The plot also shows many rides with zero or very small tips across distances, along with a few unusually large tips that may be considered outliers. A similar case is present with tip amount vs trip duration. 
-- The distribution of tip amount seems to be pretty even throughout the week
-- Our correlation heatmap provides some valuable insights into which numerical variables we might want to consider adding into our model. Fare_amount, trip_distance, and total_amount all have a correlation of above .5 with tip_amount.
-*MODELING
-** additional cleaning before modeling
-- Right before we began modeling, we decided to filter our dataset a little more. We wanted to only focus on rides where the tip_amount was greater than 0. When looking at the EDA plot for Tip Amount vs Fare Amount, one can see that there are several observations where tip amount was 0 yet fare amount varied with values much higher than 0. Therefore, it appears that tip amounts can be zero rather arbitrarily due to human decision. 
-- We also wanted to only look at rides where trip distance and trip minutes were greater than 0 due to the likelihood of rides happening often
-** modeling
-- We initially ran a multiple linear regression model with multiple predictors but after looking at the residual plots, we thought it would be best to perform a log-linear transformation as well as add a quadratic effect to one of the predictors to improve the assumptions for linear regression.
-- We experimented with predictors such as fare_amount, extra, trip_minutes, and trip_distance. After fitting multiple models and comparing how each of them satisfied the assumptions for linear regression, as well as their RMSE (Root Mean Squared Error) & MAE (Mean Absolute Error), and then even furthering our filtering process of the data to remove any outliers that were justified of removal, we finally landed on a model. 
-- Our model was log(tip_amount)=β0+β1(fare_amount)+β2(fare_amount^2)+β3(extra)
-- We also explored adding an interaction between fare_amount and extra. While the p-value was significant when running the anova to compare our models, we only saw a very minimal drop in the Sum of Square Residuals, so we decided to leave the interaction out of our model. 
-- The final log-linear model with a quadratic term for fare amount provided the best overall fit among the models considered. Diagnostic plots suggested that linearity and constant variance were reasonably improved, although not perfectly satisfied. The Q-Q plot still showed noticeable tail departures from normality, indicating that the residuals were not fully normal. In addition, a small number of potentially influential observations remained. Despite these limitations, this model was retained because it was the most reasonable linear regression model we obtained and achieved the desired predictive performance.
-- Predicted values from the log-linear model were back-transformed to the original tip scale so that prediction error could be evaluated in dollars. Using these back-transformed predictions, the model achieved an RMSE of 1.244 and an MAE of 0.926, indicating that the model satisfied the project’s required prediction benchmarks (RMSE <= 2, MAE <= 1.5)
-*ADDITIONAL THOUGHTS
-- We also ran the same analysis for 100,000 observations (evenly distributed among the 12 months) to see if our findings would be similar and that proved to be the case. 
-- *Include any additional justification as to why we are only predicting for when tip amounts are greater than 0. 
