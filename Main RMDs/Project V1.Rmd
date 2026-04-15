@@ -630,6 +630,7 @@ df_model1 = df_clean %>%
 ```{r}
 # log1p does log(1+x) so it helps when vairable is 0
 # but now doing just log
+set.seed(123)
 
 fit1 <- lm(log(tip_amount)~fare_amount +
                           I(fare_amount^2) +
@@ -734,49 +735,49 @@ mae
 
 
 
-### MODEL 2 - Cleaning for Typical Cases
+### MODEL 2 - Cleaning for Typical Cases (Did not end up using)
 ```{r}
-df_typical <- df_final %>%
-  mutate(tip_pct = tip_amount / fare_amount) %>%
-  filter(
-    tip_amount > 0,
-    # fare_amount > 0, # already filtered in original data cleaning
-    # total_amount > 0, # already filtered in original data cleaning
-    # trip_distance > 0, # already filtered in modeling data cleaning
-    # trip_minutes > 0, # already filtered in modeling data cleaning
-    between(fare_amount, quantile(fare_amount, 0.01), quantile(fare_amount, 0.99)),
-    between(total_amount, quantile(total_amount, 0.01), quantile(total_amount, 0.99)),
-    between(trip_distance, quantile(trip_distance, 0.01), quantile(trip_distance, 0.99)),
-    between(trip_minutes, quantile(trip_minutes, 0.01), quantile(trip_minutes, 0.99)),
-    between(tip_pct, quantile(tip_pct, 0.01), quantile(tip_pct, 0.99))
-  )
-
-fit2 <- lm(
-  log(tip_amount) ~ total_amount + 
-    I(total_amount^2) + 
-    extra,
-  data = df_typical
-)
-summary(fit2)
-
-# Assumptions
-par(mfrow = c(2, 2))
-plot(fit2)
-par(mfrow = c(1, 1))
-
-
-# predicted values on log scale
-pred_log <- predict(fit2)
-
-# back-transform to original dollar scale
-pred_tip <- exp(pred_log)
-
-# RMSE on original scale
-rmse <- sqrt(mean((df_typical$tip_amount - pred_tip)^2))
-rmse
-
-# MAE on original scale
-mae <- mean(abs(df_typical$tip_amount - pred_tip))
-mae
+# df_typical <- df_final %>%
+#   mutate(tip_pct = tip_amount / fare_amount) %>%
+#   filter(
+#     tip_amount > 0,
+#     # fare_amount > 0, # already filtered in original data cleaning
+#     # total_amount > 0, # already filtered in original data cleaning
+#     # trip_distance > 0, # already filtered in modeling data cleaning
+#     # trip_minutes > 0, # already filtered in modeling data cleaning
+#     between(fare_amount, quantile(fare_amount, 0.01), quantile(fare_amount, 0.99)),
+#     between(total_amount, quantile(total_amount, 0.01), quantile(total_amount, 0.99)),
+#     between(trip_distance, quantile(trip_distance, 0.01), quantile(trip_distance, 0.99)),
+#     between(trip_minutes, quantile(trip_minutes, 0.01), quantile(trip_minutes, 0.99)),
+#     between(tip_pct, quantile(tip_pct, 0.01), quantile(tip_pct, 0.99))
+#   )
+# 
+# fit2 <- lm(
+#   log(tip_amount) ~ total_amount + 
+#     I(total_amount^2) + 
+#     extra,
+#   data = df_typical
+# )
+# summary(fit2)
+# 
+# # Assumptions
+# par(mfrow = c(2, 2))
+# plot(fit2)
+# par(mfrow = c(1, 1))
+# 
+# 
+# # predicted values on log scale
+# pred_log <- predict(fit2)
+# 
+# # back-transform to original dollar scale
+# pred_tip <- exp(pred_log)
+# 
+# # RMSE on original scale
+# rmse <- sqrt(mean((df_typical$tip_amount - pred_tip)^2))
+# rmse
+# 
+# # MAE on original scale
+# mae <- mean(abs(df_typical$tip_amount - pred_tip))
+# mae
 ```
 

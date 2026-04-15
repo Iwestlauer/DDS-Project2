@@ -7,8 +7,18 @@ library(readr)
 library(DT)
 
 source("rag_V2.R", local = TRUE)
-rag_store <- initialize_rag_v2(force_rebuild = TRUE)
 
+if (file.exists("chunk_store_docx_only.rds")) {
+  file.remove("chunk_store_docx_only.rds")
+}
+
+rag_store <- initialize_rag_v2(
+  store_path = "chunk_store_docx_only.rds",
+  file_path = "../RAG/Final Project RAG Document.docx",
+  force_rebuild = TRUE
+)
+
+print(unique(rag_store$source))
 # ---------------------------
 # Load data
 # ---------------------------
@@ -20,11 +30,17 @@ data_dict <- readLines("data_description.txt", warn = FALSE)
 df_final <- df_final %>%
   mutate(
     payment_type = as.factor(payment_type),
-    month = as.factor(month),
+    month = factor(month.abb[as.numeric(as.character(month))], levels = month.abb),
     tourist_season = factor(tourist_season, levels = c(0, 1), labels = c("No", "Yes")),
     source_file = as.factor(source_file),
-    pickup_weekday_name = as.factor(pickup_weekday_name),
-    dropoff_weekday_name = as.factor(dropoff_weekday_name)
+    pickup_weekday_name = factor(
+      pickup_weekday_name,
+      levels = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+    ),
+    dropoff_weekday_name = factor(
+      dropoff_weekday_name,
+      levels = c("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+    )
   )
 
 # ---------------------------
@@ -32,10 +48,11 @@ df_final <- df_final %>%
 # ---------------------------
 numeric_vars <- names(df_final)[sapply(df_final, is.numeric)]
 cat_vars <- names(df_final)[sapply(df_final, function(x) is.character(x) || is.factor(x))]
+color_vars <- setdiff(cat_vars, c("source_file", "dropoff_weekday_name", "payment_type"))
 
-months <- sort(unique(df_final$month))
-weekdays_pickup <- sort(unique(df_final$pickup_weekday_name))
-source_files <- sort(unique(df_final$source_file))
+months <- levels(df_final$month)
+weekdays_pickup <- levels(df_final$pickup_weekday_name)
+# source_files <- sort(unique(as.character(df_final$source_file)))
 
 # ---------------------------
 # UI
@@ -71,13 +88,13 @@ ui <- dashboardPage(
             width = 4, title = "Variables",
             selectInput("x_var", "X Variable", choices = numeric_vars, selected = "trip_distance"),
             selectInput("y_var", "Y Variable", choices = numeric_vars, selected = "tip_amount"),
-            selectInput("color_var", "Color by", choices = c("None" = "none", cat_vars), selected = "pickup_weekday_name")
+            selectInput("color_var", "Color by", choices = c("None" = "none", color_vars), selected = "pickup_weekday_name")
           ),
           box(
             width = 4, title = "Filters",
             selectInput("month_filter", "Month", choices = months, selected = months, multiple = TRUE),
-            selectInput("weekday_filter", "Pickup Weekday", choices = weekdays_pickup, selected = weekdays_pickup, multiple = TRUE),
-            selectInput("source_filter", "Source File", choices = source_files, selected = source_files, multiple = TRUE)
+            selectInput("weekday_filter", "Pickup Weekday", choices = weekdays_pickup, selected = weekdays_pickup, multiple = TRUE)
+            # selectInput("source_filter", "Source File", choices = source_files, selected = source_files, multiple = TRUE)
           ),
           box(
             width = 4, title = "Options",
@@ -101,9 +118,9 @@ ui <- dashboardPage(
         fluidRow(
           box(
             width = 6, title = "Settings",
-            selectInput("bar_x", "Category (X)", choices = cat_vars, selected = "pickup_weekday_name"),
-            selectInput("bar_fill", "Fill by", choices = c("None" = "none", cat_vars), selected = "payment_type"),
-            checkboxInput("bar_percent", "Show as percentage", FALSE)
+            selectInput("bar_x", "Category (X)", choices = color_vars, selected = "pickup_weekday_name"),
+            selectInput("bar_fill", "Fill by", choices = c("None" = "none", color_vars), selected = "payment_type")
+            # checkboxInput("bar_percent", "Show as percentage", FALSE)
           ),
           box(
             width = 6, title = "Options",
@@ -177,13 +194,13 @@ ui <- dashboardPage(
 server <- function(input, output, session) {
   
   filtered_data <- reactive({
-    req(input$month_filter, input$weekday_filter, input$source_filter)
-    
+    # req(input$month_filter, input$weekday_filter, input$source_filter)
+    req(input$month_filter, input$weekday_filter)
     df_final %>%
       filter(
-        month %in% input$month_filter,
-        pickup_weekday_name %in% input$weekday_filter,
-        source_file %in% input$source_filter
+        as.character(month) %in% input$month_filter,
+        as.character(pickup_weekday_name) %in% input$weekday_filter
+        # as.character(source_file) %in% input$source_filter
       )
   })
   
@@ -191,7 +208,7 @@ server <- function(input, output, session) {
     list(
       months = input$month_filter,
       weekdays = input$weekday_filter,
-      sources = input$source_filter,
+      # sources = input$source_filter,
       n_rows = nrow(filtered_data())
     )
   })
@@ -212,7 +229,7 @@ server <- function(input, output, session) {
       result
     })
   }, ignoreInit = TRUE)
-  
+
   output$scatter_plot <- renderPlotly({
     req(input$x_var, input$y_var)
     
@@ -230,59 +247,113 @@ server <- function(input, output, session) {
         )
     }
     
-    validate(
-      need(nrow(data) > 0, "No data available for the selected filters.")
+    shiny::validate(
+      shiny::need(nrow(data) > 0, "No data available for the selected filters.")
     )
     
-    p <- ggplot(data, aes(x = .data[[input$x_var]], y = .data[[input$y_var]])) +
-      geom_point(alpha = input$alpha, size = 2) +
-      theme_minimal() +
-      labs(
-        title = as.character(paste(input$y_var, "vs", input$x_var)),
-        x = as.character(input$x_var),
-        y = as.character(input$y_var)
+    data <- data %>%
+      mutate(
+        .x = .data[[input$x_var]],
+        .y = .data[[input$y_var]],
+        .color = if (input$color_var == "none") factor("All") else factor(.data[[input$color_var]], levels = levels(df_final[[input$color_var]]))
       )
     
-    if (input$color_var != "none") {
-      p <- p +
-        aes(color = .data[[input$color_var]]) +
-        labs(color = as.character(input$color_var))
+    data <- data %>%
+      mutate(
+        .tooltip = if (input$color_var == "none") {
+          paste0(
+            input$x_var, ": ", .x,
+            "<br>", input$y_var, ": ", .y
+          )
+        } else {
+          paste0(
+            input$x_var, ": ", .x,
+            "<br>", input$y_var, ": ", .y,
+            "<br>", input$color_var, ": ", .color
+          )
+        }
+      )
+    
+    p <- plotly::plot_ly(
+      data = data,
+      x = ~.x,
+      y = ~.y,
+      type = "scattergl",
+      mode = "markers",
+      color = if (input$color_var == "none") NULL else ~.color,
+      text = ~.tooltip,
+      hoverinfo = "text",
+      marker = list(size = 6, opacity = input$alpha)
+    )
+    
+    if (isTRUE(input$add_smooth) && nrow(data) >= 2) {
+      fit <- lm(.y ~ .x, data = data)
+      
+      line_df <- data.frame(
+        .x = seq(min(data$.x), max(data$.x), length.out = 200)
+      )
+      line_df$.y <- predict(fit, newdata = line_df)
+      
+      p <- p %>%
+        plotly::add_lines(
+          data = line_df,
+          x = ~.x,
+          y = ~.y,
+          inherit = FALSE,
+          name = "Trend line"
+        )
     }
     
-    if (isTRUE(input$log_scale)) {
-      p <- p + scale_x_log10() + scale_y_log10()
-    }
-    
-    if (isTRUE(input$add_smooth)) {
-      p <- p + geom_smooth(method = "lm", se = FALSE)
-    }
-    
-    tooltips <- if (input$color_var != "none") c("x", "y", "colour") else c("x", "y")
-    
-    plotly::ggplotly(p, tooltip = tooltips)
+    p %>%
+      plotly::layout(
+        title = paste(input$y_var, "vs", input$x_var),
+        xaxis = list(
+          title = input$x_var,
+          type = if (isTRUE(input$log_scale)) "log" else "linear"
+        ),
+        yaxis = list(
+          title = input$y_var,
+          type = if (isTRUE(input$log_scale)) "log" else "linear"
+        )
+      )
   })
-  
+
   output$bar_plot <- renderPlotly({
     req(input$bar_x)
     
+    plot_data <- filtered_data()
+    
     if (input$bar_fill == "none") {
-      data_sum <- df_final %>%
-        count(.data[[input$bar_x]], name = "n") %>%
-        arrange(desc(n))
+      data_sum <- plot_data %>%
+        count(.data[[input$bar_x]], name = "n")
       
-      p <- ggplot(data_sum, aes(x = reorder(.data[[input$bar_x]], n), y = n)) +
+      if (is.factor(plot_data[[input$bar_x]])) {
+        data_sum[[input$bar_x]] <- factor(
+          data_sum[[input$bar_x]],
+          levels = levels(plot_data[[input$bar_x]])
+        )
+      }
+      
+      p <- ggplot(data_sum, aes(x = .data[[input$bar_x]], y = n)) +
         geom_col(fill = "steelblue")
+      
     } else {
-      data_sum <- df_final %>%
+      data_sum <- plot_data %>%
         count(.data[[input$bar_x]], .data[[input$bar_fill]], name = "n")
       
-      totals <- data_sum %>%
-        group_by(.data[[input$bar_x]]) %>%
-        summarize(total = sum(n), .groups = "drop") %>%
-        arrange(desc(total))
+      if (is.factor(plot_data[[input$bar_x]])) {
+        data_sum[[input$bar_x]] <- factor(
+          data_sum[[input$bar_x]],
+          levels = levels(plot_data[[input$bar_x]])
+        )
+      }
       
-      data_sum <- data_sum %>%
-        mutate(!!input$bar_x := factor(.data[[input$bar_x]], levels = totals[[input$bar_x]]))
+      if (is.factor(plot_data[[input$bar_fill]])) {
+        data_sum[[input$bar_fill]] <- factor(
+          data_sum[[input$bar_fill]],
+          levels = levels(plot_data[[input$bar_fill]])
+        )
+      }
       
       p <- ggplot(
         data_sum,
@@ -299,7 +370,7 @@ server <- function(input, output, session) {
       labs(
         title = paste("Distribution of", input$bar_x),
         x = input$bar_x,
-        y = if (input$bar_percent) "Proportion" else "Count"
+        y =  "Count"
       )
     
     if (input$bar_theme == "Classic") {
