@@ -24,7 +24,7 @@ library(ggrepel)
 library(ggpmisc)
 library(scales)
 library(readr)
-library(arrow)
+library(forcats)
 ```
 
 # Read in Data, Select, Filter, Sample, and Mutate/Feature Engineering
@@ -393,6 +393,37 @@ ggplot(df_final, aes(x = trip_minutes, y = tip_amount)) +
 
 # See how tip amount varies over time
 ```{r}
+# tip amount over pickup hour (24 hour based)
+df_hourly <- df_final %>%
+  group_by(pickup_hour) %>%
+  summarise(
+    median_tip = median(tip_amount, na.rm = TRUE),
+    avg_tip = mean(tip_amount, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+ggplot(df_hourly, aes(x = pickup_hour, y = median_tip)) +
+  
+  # Line for trend
+  geom_line(color = "black", linewidth = 1) +
+  # Points for each hour
+  geom_point(color = "black", size = 2) +
+  geom_smooth(method = "loess", se = FALSE, color = "red", linetype = "dashed") +
+  scale_x_continuous(breaks = seq(0, 23, by = 2)) +
+  labs(
+    title = "Tip Amount by Pickup Hour",
+    subtitle = "Median tip peaks around midday",
+    x = "Hour of Day (24-hour time)",
+    y = "Median Tip Amount ($)",
+    caption = "Hourly median tip amounts show minimal variation across the full day"
+  ) +
+  theme_taxi() +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12),
+    plot.caption = element_text(size = 9, color = "black")
+  )
+
 # Tip amount by weekday
 ggplot(df_final, aes(x = pickup_weekday_name, y = tip_amount)) +
   geom_boxplot() +
@@ -402,6 +433,44 @@ ggplot(df_final, aes(x = pickup_weekday_name, y = tip_amount)) +
     y = "Tip Amount"
   ) +
   theme_taxi()
+
+# Tip amount by weekday -annotated
+summary_stats <- df_final %>%
+  group_by(pickup_weekday_name) %>%
+  summarise(median_tip = median(tip_amount, na.rm = TRUE))
+
+ggplot(df_final, aes(x = fct_relevel(pickup_weekday_name,
+                                     "Monday", "Tuesday", "Wednesday",
+                                     "Thursday", "Friday", "Saturday", "Sunday"),
+                     y = tip_amount)) +
+  
+  # Boxplot (cleaner look)
+  geom_boxplot(fill = "black", color = "#FFF200", outlier.alpha = 0.2, outlier.colour = "black") +
+  
+  # Add median points for emphasis
+  stat_summary(fun = median, geom = "point", color = "#FFF200", size = 2) +
+  
+  # Optional: jittered points for texture (sample if large dataset)
+  # geom_jitter(alpha = 0.05, width = 0.2, color = "#FFF200")
+  
+  coord_cartesian(ylim = c(0, 20)) +
+  
+  labs(
+    title = "Tip Amount by Day of Week",
+    subtitle = "No meaningful variation in tipping behavior across weekdays",
+    x = "Day of Week",
+    y = "Tip Amount ($)",
+    caption = "Median and interquartile ranges are consistent across all days"
+  ) +
+  
+  theme_taxi() +
+  
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12),
+    axis.text.x = element_text(angle = 30, hjust = 1),
+    plot.caption = element_text(size = 9, color = "black")
+  )
 
 # Tip amount by month
 df_final %>%
@@ -415,6 +484,47 @@ df_final %>%
     y = "Average Tip Amount"
   )+
   theme_taxi()
+
+# Tip amount by month - annotated
+
+df_plot <- df_final %>%
+  mutate(
+    month = factor(month, levels = 1:12, labels = month.abb),
+    tourist_season = ifelse(month %in% c("Jul", "Aug", "Oct", "Nov", "Dec"),
+                            "Tourist Season", "Non-Tourist Season")
+  ) %>%
+  group_by(month, tourist_season) %>%
+  summarise(avg_tip_amt = mean(tip_amount, na.rm = TRUE), .groups = "drop")
+
+ggplot(df_plot, aes(x = month, y = avg_tip_amt, fill = tourist_season)) +
+  
+  geom_col(color = "black", width = 0.7) +
+  
+  scale_fill_manual(
+    values = c(
+      "Tourist Season" = "gray",
+      "Non-Tourist Season" = "gray30"
+    )
+  ) +
+  
+  labs(
+    title = "Average Tip Amount by Month",
+    subtitle = "Tourist seasons (Jul–Aug, Oct–Dec) show no substantial increase in tipping",
+    x = "Month",
+    y = "Average Tip Amount ($)",
+    fill = "",
+    caption = "Differences across months are minimal despite seasonal travel patterns"
+  ) +
+  
+  theme_taxi() +
+  
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12),
+    axis.text.x = element_text(angle = 30, hjust = 1),
+    legend.position = "top",
+    plot.caption = element_text(size = 9, color = "black")
+  )
 ```
 
 # Look at Tourist Season: July, Oct-Dec

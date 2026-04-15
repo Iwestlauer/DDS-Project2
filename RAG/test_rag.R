@@ -23,6 +23,10 @@ library(stringr)
 library(tibble)
 library(officer)
 
+# read files
+library(readr)
+library(pdftools)
+
 # ---- settings ----
 # docx_path <- "RAG/Final Project RAG Document.docx"
 # pdf_path <- "Project Docs/data_dictionary_trip_records_yellow.pdf"
@@ -33,11 +37,10 @@ chat_model <- "meta-llama/Llama-3.1-8B-Instruct:cerebras"
 
 # ---- checks ----
 if (hf_token == "") stop("HUGGINGFACE_API_KEY is not set in your R environment.")
-if (!file.exists(docx_path)) stop("DOCX file not found: ", docx_path)
-if (!file.exists(pdf_path)) stop("PDF file not found: ", pdf_path)
-
 cat("HUGGINGFACE_API_KEY found\n")
-cat("DOCX file found\n")
+# if (!file.exists(docx_path)) stop("DOCX file not found: ", docx_path)
+# cat("DOCX file found\n")
+# if (!file.exists(pdf_path)) stop("PDF file not found: ", pdf_path)
 
 # ---- read docx ----
 read_docx_text <- function(path) {
@@ -50,6 +53,26 @@ read_docx_text <- function(path) {
     paste(collapse = "\n")
   
   str_squish(txt)
+}
+
+read_rmd_file <- function(path) {
+  tibble(
+    source = basename(path),
+    text = read_file(path)
+  )
+}
+
+read_docx_file <- function(path) {
+  doc <- read_docx(path)
+  s <- docx_summary(doc)
+  
+  tibble(
+    source = basename(path),
+    text = s |>
+      dplyr::filter(content_type == "paragraph") |>
+      dplyr::pull(text) |>
+      paste(collapse = "\n")
+  )
 }
 
 read_pdf_file <- function(path) {
@@ -228,7 +251,7 @@ cat("Chat test response:\n")
 cat(chat_test_out$choices[[1]]$message$content, "\n\n")
 
 # ---- ask a sample question ----
-sample_question <- "Is there code for a plot for the distribution of tip percent?"
+sample_question <- "What are three key insights?"
 #What steps were taken for data cleaning?
 #Were airport trips included?
 #Describe the distribution of tip amount?
