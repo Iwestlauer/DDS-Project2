@@ -6,6 +6,9 @@ library(plotly)
 library(readr)
 library(DT)
 
+source("rag_V2.R", local = TRUE)
+rag_store <- initialize_rag_v2(force_rebuild = TRUE)
+
 # ---------------------------
 # Load data
 # ---------------------------
@@ -14,7 +17,6 @@ df_final <- read_csv("df_rshiny.csv", show_col_types = FALSE)
 # Load data dictionary
 data_dict <- readLines("data_description.txt", warn = FALSE)
 
-# Optional: convert some variables to factors for cleaner display
 df_final <- df_final %>%
   mutate(
     payment_type = as.factor(payment_type),
@@ -46,8 +48,8 @@ ui <- dashboardPage(
       menuItem("Scatterplot", tabName = "scatter"),
       menuItem("Barchart", tabName = "bar"),
       menuItem("Data Viewer", tabName = "data"),
-      menuItem("Data Dictionary", tabName = "dictionary")
-      # menuItem("Chatbot", tabName = "chatbot" )
+      menuItem("Data Dictionary", tabName = "dictionary"),
+      menuItem("Ask the Analysis", tabName = "rag", icon = icon("comments"))
     )
   ),
   
@@ -73,24 +75,9 @@ ui <- dashboardPage(
           ),
           box(
             width = 4, title = "Filters",
-            selectInput(
-              "month_filter", "Month",
-              choices = months,
-              selected = months,
-              multiple = TRUE
-            ),
-            selectInput(
-              "weekday_filter", "Pickup Weekday",
-              choices = weekdays_pickup,
-              selected = weekdays_pickup,
-              multiple = TRUE
-            ),
-            selectInput(
-              "source_filter", "Source File",
-              choices = source_files,
-              selected = source_files,
-              multiple = TRUE
-            )
+            selectInput("month_filter", "Month", choices = months, selected = months, multiple = TRUE),
+            selectInput("weekday_filter", "Pickup Weekday", choices = weekdays_pickup, selected = weekdays_pickup, multiple = TRUE),
+            selectInput("source_filter", "Source File", choices = source_files, selected = source_files, multiple = TRUE)
           ),
           box(
             width = 4, title = "Options",
@@ -148,6 +135,37 @@ ui <- dashboardPage(
             verbatimTextOutput("data_dict", placeholder = FALSE)
           )
         )
+      ),
+      
+      # RAG tab
+      tabItem(
+        tabName = "rag",
+        fluidRow(
+          box(
+            width = 4, status = "primary",
+            title = "Ask a Question",
+            textAreaInput(
+              "rag_question",
+              "Enter your question",
+              rows = 6,
+              placeholder = "Example: What are the main tipping patterns in this project?"
+            ),
+            checkboxInput("use_filter_context", "Use current dashboard filters as context", TRUE),
+            actionButton("ask_rag", "Ask")
+          ),
+          box(
+            width = 8, status = "primary",
+            title = "RAG Answer",
+            verbatimTextOutput("rag_answer")
+          )
+        ),
+        fluidRow(
+          box(
+            width = 12, status = "info",
+            title = "Retrieved Chunks",
+            DT::dataTableOutput("rag_sources")
+          )
+        )
       )
     )
   )
@@ -158,7 +176,6 @@ ui <- dashboardPage(
 # ---------------------------
 server <- function(input, output, session) {
   
-  # Reactive filtered data for scatterplot
   filtered_data <- reactive({
     req(input$month_filter, input$weekday_filter, input$source_filter)
     
@@ -170,7 +187,32 @@ server <- function(input, output, session) {
       )
   })
   
-  # Scatterplot
+  rag_context <- reactive({
+    list(
+      months = input$month_filter,
+      weekdays = input$weekday_filter,
+      sources = input$source_filter,
+      n_rows = nrow(filtered_data())
+    )
+  })
+  
+  rag_result <- eventReactive(input$ask_rag, {
+    req(nzchar(trimws(input$rag_question)))
+    
+    withProgress(message = "Generating response...", value = 0, {
+      incProgress(0.3)
+      
+      result <- run_rag(
+        question = input$rag_question,
+        context = if (isTRUE(input$use_filter_context)) rag_context() else NULL,
+        store = rag_store
+      )
+      
+      incProgress(1)
+      result
+    })
+  }, ignoreInit = TRUE)
+  
   output$scatter_plot <- renderPlotly({
     req(input$x_var, input$y_var)
     
@@ -180,7 +222,7 @@ server <- function(input, output, session) {
         !is.na(.data[[input$y_var]])
       )
     
-    if (input$log_scale) {
+    if (isTRUE(input$log_scale)) {
       data <- data %>%
         filter(
           .data[[input$x_var]] > 0,
@@ -188,33 +230,38 @@ server <- function(input, output, session) {
         )
     }
     
+    validate(
+      need(nrow(data) > 0, "No data available for the selected filters.")
+    )
+    
     p <- ggplot(data, aes(x = .data[[input$x_var]], y = .data[[input$y_var]])) +
       geom_point(alpha = input$alpha, size = 2) +
       theme_minimal() +
       labs(
-        title = paste(input$y_var, "vs", input$x_var),
-        x = input$x_var,
-        y = input$y_var
+        title = as.character(paste(input$y_var, "vs", input$x_var)),
+        x = as.character(input$x_var),
+        y = as.character(input$y_var)
       )
     
     if (input$color_var != "none") {
       p <- p +
         aes(color = .data[[input$color_var]]) +
-        labs(color = input$color_var)
+        labs(color = as.character(input$color_var))
     }
     
-    if (input$log_scale) {
+    if (isTRUE(input$log_scale)) {
       p <- p + scale_x_log10() + scale_y_log10()
     }
     
-    if (input$add_smooth) {
+    if (isTRUE(input$add_smooth)) {
       p <- p + geom_smooth(method = "lm", se = FALSE)
     }
     
-    ggplotly(p, tooltip = c("x", "y", "colour"))
+    tooltips <- if (input$color_var != "none") c("x", "y", "colour") else c("x", "y")
+    
+    plotly::ggplotly(p, tooltip = tooltips)
   })
   
-  # Barchart
   output$bar_plot <- renderPlotly({
     req(input$bar_x)
     
@@ -267,10 +314,9 @@ server <- function(input, output, session) {
       p <- p + coord_flip()
     }
     
-    ggplotly(p)
+    plotly::ggplotly(p)
   })
   
-  # Data viewer
   output$data_table <- DT::renderDataTable({
     df_final
   },
@@ -282,10 +328,27 @@ server <- function(input, output, session) {
   ),
   rownames = FALSE)
   
-  # Data dictionary
   output$data_dict <- renderPrint({
     cat(paste(data_dict, collapse = "\n"))
   })
+  
+  output$rag_answer <- renderText({
+    req(rag_result())
+    rag_result()$answer
+  })
+  
+  output$rag_sources <- DT::renderDataTable({
+    req(rag_result())
+    
+    rag_result()$sources %>%
+      mutate(
+        score = round(score, 4),
+        preview = stringr::str_trunc(chunk, 250)
+      ) %>%
+      select(chunk_id, source, score, preview)
+  },
+  options = list(pageLength = 5, scrollX = TRUE),
+  rownames = FALSE)
 }
 
 shinyApp(ui, server)
