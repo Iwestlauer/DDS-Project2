@@ -6,7 +6,7 @@ library(plotly)
 library(readr)
 library(DT)
 
-source("../RAG/rag_V2.R", local = TRUE)
+source("rag_V2.R", local = TRUE)
 
 if (file.exists("chunk_store_docx_only.rds")) {
   file.remove("chunk_store_docx_only.rds")
