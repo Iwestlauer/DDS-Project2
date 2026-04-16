@@ -642,7 +642,7 @@ summary(fit1)
 # trip_distance & trip_minutes are not seen as significant predictors so we will remove
 ```
 
-### MODEL 2
+### MODEL 2 (also tested for interaction)
 ```{r}
 fit2 <- lm(log(tip_amount)~fare_amount + 
                           I(fare_amount^2)  + 
