@@ -58,7 +58,7 @@ weekdays_pickup <- levels(df_final$pickup_weekday_name)
 # UI
 # ---------------------------
 ui <- dashboardPage(
-  dashboardHeader(title = "Trip Data EDA"),
+  dashboardHeader(title = "Tip Analysis"),
   
   dashboardSidebar(
     sidebarMenu(
@@ -136,7 +136,7 @@ ui <- dashboardPage(
         fluidRow(
           box(
             width = 12, status = "primary",
-            title = "Raw Trip Data",
+            title = "Transformed Trip Data",
             DT::dataTableOutput("data_table", height = "600px")
           )
         )
