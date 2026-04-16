@@ -627,6 +627,41 @@ df_model1 = df_clean %>%
 
 ```
 
+### PRE-LOG MODEL 
+```{r}
+set.seed(123)
+
+fitp <- lm((tip_amount)~fare_amount +
+                          I(fare_amount^2) +
+                          trip_distance +
+                          extra +
+                          trip_minutes,
+                          data = df_model1)
+summary(fitp)
+
+# Assumptions
+par(mfrow = c(2, 2))
+plot(fitp)
+par(mfrow = c(1, 1))
+
+
+# predicted values on log scale
+# pred_log <- predict(fitp)
+
+# back-transform to original dollar scale
+pred_tip <- predict(fitp)
+
+# RMSE on original scale
+rmse <- sqrt(mean((df_model1$tip_amount - pred_tip)^2))
+rmse
+
+# MAE on original scale
+mae <- mean(abs(df_model1$tip_amount - pred_tip))
+mae
+
+```
+
+
 ### MODEL 1
 ```{r}
 set.seed(123)

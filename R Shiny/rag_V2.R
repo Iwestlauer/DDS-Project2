@@ -1,5 +1,4 @@
 library(readr)
-library(pdftools)
 library(officer)
 library(dplyr)
 library(purrr)
@@ -9,24 +8,11 @@ library(tidyr)
 library(httr2)
 library(jsonlite)
 
-# ---------------------------
-# File readers
-# ---------------------------
-read_rmd_file <- function(path) {
-  tibble(
-    source = basename(path),
-    text = read_file(path)
-  )
-}
+message("Loaded DOCX-ONLY rag_V2.R")
 
-read_pdf_file <- function(path) {
-  txt <- pdf_text(path)
-  tibble(
-    source = basename(path),
-    text = paste(txt, collapse = "\n")
-  )
-}
-
+# ---------------------------
+# Read DOCX only
+# ---------------------------
 read_docx_file <- function(path) {
   doc <- read_docx(path)
   s <- docx_summary(doc)
@@ -38,16 +24,6 @@ read_docx_file <- function(path) {
       dplyr::pull(text) %>%
       paste(collapse = "\n")
   )
-}
-
-read_project_file <- function(path) {
-  ext <- tolower(tools::file_ext(path))
-  
-  if (ext == "rmd") return(read_rmd_file(path))
-  if (ext == "pdf") return(read_pdf_file(path))
-  if (ext == "docx") return(read_docx_file(path))
-  
-  stop(paste("Unsupported file type:", ext))
 }
 
 # ---------------------------
@@ -92,12 +68,44 @@ cosine_sim <- function(a, b) {
 }
 
 # ---------------------------
-# Build / load chunk store
+# Resolve DOCX path
 # ---------------------------
-build_chunk_store <- function(file_paths, hf_token,
+resolve_docx_path <- function(file_path = NULL) {
+  if (!is.null(file_path)) {
+    if (!file.exists(file_path)) {
+      stop(paste("DOCX file was not found:", file_path))
+    }
+    return(file_path)
+  }
+  
+  candidate_paths <- c(
+    "../RAG/Final Project RAG Document.docx"
+    # "Final Project RAG Document.docx"
+  )
+  
+  existing <- candidate_paths[file.exists(candidate_paths)]
+  
+  if (length(existing) == 0) {
+    stop(
+      paste(
+        "Final Project RAG Document.docx was not found in any expected location.",
+        "Checked:",
+        paste(candidate_paths, collapse = "\n"),
+        sep = "\n"
+      )
+    )
+  }
+  
+  existing[1]
+}
+
+# ---------------------------
+# Build local chunk store
+# ---------------------------
+build_chunk_store <- function(file_path, hf_token,
                               chunk_size = 700, overlap = 120) {
   
-  docs <- purrr::map_dfr(file_paths, read_project_file)
+  docs <- read_docx_file(file_path)
   
   chunks <- docs %>%
     mutate(chunk = map(text, chunk_text, chunk_size = chunk_size, overlap = overlap)) %>%
@@ -110,28 +118,32 @@ build_chunk_store <- function(file_paths, hf_token,
   chunks
 }
 
-initialize_rag <- function(
-    store_path = "RAG/chunk_store.rds",
-    file_paths = c(
-      "Main RMDs/Project V1.Rmd",
-      "Project Docs/data_dictionary_trip_records_yellow.pdf",
-      "RAG/Final Project RAG Document.docx"
-    ),
+initialize_rag_v2 <- function(
+    store_path = "chunk_store.rds",
+    file_path = NULL,
     hf_token = Sys.getenv("HUGGINGFACE_API_KEY"),
     force_rebuild = FALSE
 ) {
   
+  message("Running initialize_rag_v2()")
+  print(getwd())
+  
   if (hf_token == "") {
     stop("HUGGINGFACE_API_KEY is not set")
   }
+  
+  resolved_docx <- resolve_docx_path(file_path)
+  print(resolved_docx)
   
   if (file.exists(store_path) && !force_rebuild) {
     return(readRDS(store_path))
   }
   
   store <- build_chunk_store(
-    file_paths = file_paths,
-    hf_token = hf_token
+    file_path = resolved_docx,
+    hf_token = hf_token,
+    chunk_size = 700,
+    overlap = 120
   )
   
   saveRDS(store, store_path)
@@ -153,7 +165,7 @@ retrieve_chunks <- function(question, store, hf_token, k = 3) {
 }
 
 # ---------------------------
-# Prompt helpers
+# Dashboard context
 # ---------------------------
 format_dashboard_context <- function(context = NULL) {
   if (is.null(context)) return("")
@@ -162,14 +174,13 @@ format_dashboard_context <- function(context = NULL) {
     "Current dashboard filters:",
     paste("Months:", paste(context$months, collapse = ", ")),
     paste("Pickup weekdays:", paste(context$weekdays, collapse = ", ")),
-    paste("Source files:", paste(context$sources, collapse = ", ")),
     paste("Filtered rows:", context$n_rows),
     sep = "\n"
   )
 }
 
 # ---------------------------
-# Chat call
+# Hugging Face chat call
 # ---------------------------
 hf_chat <- function(question, retrieved, hf_token,
                     dashboard_context = "",
@@ -187,7 +198,7 @@ hf_chat <- function(question, retrieved, hf_token,
     "",
     if (dashboard_context != "") paste("Dashboard context:\n", dashboard_context) else "",
     "",
-    "Retrieved context:",
+    "Context:",
     context,
     "",
     "Question:",
@@ -229,27 +240,29 @@ hf_chat <- function(question, retrieved, hf_token,
 }
 
 # ---------------------------
-# Main function for Shiny
+# Main function for app.R
 # ---------------------------
-run_rag <- function(question, context = NULL, store, hf_token = Sys.getenv("HUGGINGFACE_API_KEY"), k = 3) {
+run_rag <- function(question, context = NULL, store,
+                    hf_token = Sys.getenv("HUGGINGFACE_API_KEY"),
+                    k = 3,
+                    debug = FALSE) {
+  
   if (hf_token == "") {
     stop("HUGGINGFACE_API_KEY is not set")
   }
   
   dashboard_context <- format_dashboard_context(context)
   
-  retrieval_query <- if (dashboard_context == "") {
-    question
-  } else {
-    paste(question, dashboard_context)
-  }
-  
   retrieved <- retrieve_chunks(
-    question = retrieval_query,
+    question = question,
     store = store,
     hf_token = hf_token,
     k = k
   )
+  
+  if (isTRUE(debug)) {
+    print(retrieved %>% select(chunk_id, source, score, chunk))
+  }
   
   answer <- hf_chat(
     question = question,

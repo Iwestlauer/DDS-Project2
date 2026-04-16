@@ -6,7 +6,7 @@ library(plotly)
 library(readr)
 library(DT)
 
-source("../RAG/rag_V2.R", local = TRUE)
+source("rag_V2.R", local = TRUE)
 
 if (file.exists("chunk_store_docx_only.rds")) {
   file.remove("chunk_store_docx_only.rds")
@@ -14,9 +14,19 @@ if (file.exists("chunk_store_docx_only.rds")) {
 
 rag_store <- initialize_rag_v2(
   store_path = "chunk_store_docx_only.rds",
-  file_path = "../RAG/Final Project RAG Document.docx",
+  file_path = "Final Project RAG Document.docx",
   force_rebuild = TRUE
 )
+
+# source("rag_V2.R", local = TRUE)
+# 
+# rag_store <- initialize_rag_v2(
+#   store_path = "chunk_store_docx_only.rds",
+#   force_rebuild = FALSE
+# )
+
+
+
 
 print(unique(rag_store$source))
 # ---------------------------
