@@ -14,7 +14,7 @@ if (file.exists("chunk_store_docx_only.rds")) {
 
 rag_store <- initialize_rag_v2(
   store_path = "chunk_store_docx_only.rds",
-  file_path = "../RAG/Final Project RAG Document.docx",
+  file_path = "Final Project RAG Document.docx",
   force_rebuild = TRUE
 )
 
