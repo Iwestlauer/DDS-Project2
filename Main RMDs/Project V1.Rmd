@@ -753,22 +753,22 @@ df_o1 = df_clean[c(1902, 4805,2217),]
 #     between(tip_pct, quantile(tip_pct, 0.01), quantile(tip_pct, 0.99))
 #   )
 # 
-# fit2 <- lm(
+# fit3 <- lm(
 #   log(tip_amount) ~ total_amount +
 #     I(total_amount^2) +
 #     extra,
 #   data = df_typical
 # )
-# summary(fit2)
+# summary(fit3)
 # 
 # # Assumptions
 # par(mfrow = c(2, 2))
-# plot(fit2)
+# plot(fit3)
 # par(mfrow = c(1, 1))
 # 
 # 
 # # predicted values on log scale
-# pred_log <- predict(fit2)
+# pred_log <- predict(fit3)
 # 
 # # back-transform to original dollar scale
 # pred_tip <- exp(pred_log)
