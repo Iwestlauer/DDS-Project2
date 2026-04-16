@@ -18,6 +18,16 @@ rag_store <- initialize_rag_v2(
   force_rebuild = TRUE
 )
 
+# source("rag_V2.R", local = TRUE)
+# 
+# rag_store <- initialize_rag_v2(
+#   store_path = "chunk_store_docx_only.rds",
+#   force_rebuild = FALSE
+# )
+
+
+
+
 print(unique(rag_store$source))
 # ---------------------------
 # Load data
