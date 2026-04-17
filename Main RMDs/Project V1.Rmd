@@ -51,7 +51,6 @@ zone_lookup <- read.csv(here("Additional Data", "NYC_Taxi_Zones.csv"))
 # parquet1_test = parquet1_test %>% mutate(TotalAmount2 = fare_amount + extra + mta_tax + tolls_amount + improvement_surcharge + Airport_fee + cbd_congestion_fee + tip_amount)
 
 # Findings: total amount is equal to fare_amount + extra taxes / amounts + tip_amount. It does NOT include however "congestion_surchage"
-
 ```
 
 
@@ -720,7 +719,7 @@ anova(fit2, fit_3)
 # yes significant p-value when added however RSS drop does not seem significant enough to hurt parsimony of model so we will proceed without
 ```
 
-# Comparing Metrics With Interaction vs Without
+### Comparing Metrics With Interaction vs Without
 ```{r}
 # predicted values on log scale
 pred_log_2 <- predict(fit2)
@@ -745,7 +744,7 @@ mae_3 <- mean(abs(df_model1$tip_amount - pred_tip_3))
 mae_3
 ```
 
-# Seeing if there any signficant outliers
+### Seeing if there any signficant outliers
 ```{r}
 # studentized residuals, leverage, Cook's distance
 rstud <- rstudent(fit1)
